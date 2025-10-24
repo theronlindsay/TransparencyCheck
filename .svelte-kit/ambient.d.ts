@@ -26,6 +26,7 @@
  * ```
  */
 declare module '$env/static/private' {
+	export const CONGRESS_API_KEY: string;
 	export const ACSvcPort: string;
 	export const ALLUSERSPROFILE: string;
 	export const ANDROID_HOME: string;
@@ -40,10 +41,20 @@ declare module '$env/static/private' {
 	export const CommonProgramW6432: string;
 	export const COMPUTERNAME: string;
 	export const ComSpec: string;
+	export const CUDA_PATH: string;
+	export const CUDA_PATH_V12_4: string;
 	export const DriverData: string;
 	export const EDITOR: string;
-	export const EFC_29108_1592913036: string;
+	export const EFC_18284_1262719628: string;
+	export const EFC_18284_1592913036: string;
+	export const EFC_18284_2283032206: string;
+	export const EFC_18284_2397410445: string;
+	export const EFC_18284_2775293581: string;
+	export const EFC_18284_3789132940: string;
+	export const FPS_BROWSER_APP_PROFILE_STRING: string;
+	export const FPS_BROWSER_USER_PROFILE_STRING: string;
 	export const GIT_ASKPASS: string;
+	export const GIT_PAGER: string;
 	export const HOME: string;
 	export const HOMEDRIVE: string;
 	export const HOMEPATH: string;
@@ -115,7 +126,6 @@ declare module '$env/static/private' {
 	export const VSCODE_INJECTION: string;
 	export const VSCODE_PYTHON_AUTOACTIVATE_GUARD: string;
 	export const windir: string;
-	export const __COMPAT_LAYER: string;
 }
 
 /**
@@ -145,6 +155,7 @@ declare module '$env/static/public' {
  */
 declare module '$env/dynamic/private' {
 	export const env: {
+		CONGRESS_API_KEY: string;
 		ACSvcPort: string;
 		ALLUSERSPROFILE: string;
 		ANDROID_HOME: string;
@@ -159,10 +170,20 @@ declare module '$env/dynamic/private' {
 		CommonProgramW6432: string;
 		COMPUTERNAME: string;
 		ComSpec: string;
+		CUDA_PATH: string;
+		CUDA_PATH_V12_4: string;
 		DriverData: string;
 		EDITOR: string;
-		EFC_29108_1592913036: string;
+		EFC_18284_1262719628: string;
+		EFC_18284_1592913036: string;
+		EFC_18284_2283032206: string;
+		EFC_18284_2397410445: string;
+		EFC_18284_2775293581: string;
+		EFC_18284_3789132940: string;
+		FPS_BROWSER_APP_PROFILE_STRING: string;
+		FPS_BROWSER_USER_PROFILE_STRING: string;
 		GIT_ASKPASS: string;
+		GIT_PAGER: string;
 		HOME: string;
 		HOMEDRIVE: string;
 		HOMEPATH: string;
@@ -234,7 +255,6 @@ declare module '$env/dynamic/private' {
 		VSCODE_INJECTION: string;
 		VSCODE_PYTHON_AUTOACTIVATE_GUARD: string;
 		windir: string;
-		__COMPAT_LAYER: string;
 		[key: `PUBLIC_${string}`]: undefined;
 		[key: `${string}`]: string | undefined;
 	}

@@ -1,20 +1,36 @@
 <script>
 	import { onMount } from 'svelte';
+	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
 
 	// Props for customization
-	export let items = [
-		{ id: 'home', label: 'Home', active: true },
-		{ id: 'bills', label: 'Bills', active: false },
-		{ id: 'recent', label: 'Recent', active: false },
-		{ id: 'heirarchy', label: 'Heirarchy', active: false },
-		{ id: 'chat', label: 'Chat', active: false }
-	];
+	let { items = [
+		{ id: 'home', label: 'Home', active: true, href: '/' },
+		{ id: 'table', label: 'Table', active: false, href: '/table' },
+		{ id: 'api-demo', label: 'API Demo', active: false, href: '/api-demo' },
+		{ id: 'bills', label: 'Bills', active: false, href: '/bills' },
+		{ id: 'recent', label: 'Recent', active: false, href: '/recent' },
+		{ id: 'heirarchy', label: 'Heirarchy', active: false, href: '/heirarchy' },
+		{ id: 'chat', label: 'Chat', active: false, href: '/chat' }
+	] } = $props();
 
-	let activeItem = items.find(item => item.active)?.id || items[0]?.id;
-	let visuallyActiveItem = activeItem; // Separate state for visual boldness
+	let activeItem = $derived.by(() => {
+		const currentPath = $page.url.pathname;
+		const matchedItem = items.find(item => item.href === currentPath);
+		return matchedItem?.id || items[0]?.id;
+	});
+	
+	let visuallyActiveItem = $state('');
 	let selectorElement;
 	let navElement;
 	let itemElements = {};
+
+	// Update visual state when active item changes
+	$effect(() => {
+		visuallyActiveItem = activeItem;
+		// Delay the selector movement slightly to ensure DOM is ready
+		setTimeout(() => moveSelector(activeItem), 10);
+	});
 
 	// Function to move the selector to the active item
 	function moveSelector(targetId) {
@@ -34,20 +50,21 @@
 	}
 
 	// Handle item click
-	function handleItemClick(itemId) {
-		activeItem = itemId;
+	function handleItemClick(itemId, href) {
+		// Don't navigate if already on this page
+		if (activeItem === itemId) return;
+		
 		moveSelector(itemId);
 		
 		// Delay the visual boldness change until near the end of animation (300ms out of 400ms)
 		setTimeout(() => {
 			visuallyActiveItem = itemId;
 		}, 300);
-		
-		// Update items array
-		items = items.map(item => ({
-			...item,
-			active: item.id === itemId
-		}));
+
+		// Use SvelteKit's client-side navigation (no page reload!)
+		if (href) {
+			goto(href);
+		}
 	}
 
 	// Initialize selector position
@@ -66,6 +83,16 @@
 		window.addEventListener('resize', handleResize);
 		return () => window.removeEventListener('resize', handleResize);
 	});
+
+
+
+	//Force Update Logic 
+	// Sync control for the navbar button
+	let syncing = $state(false);
+
+	async function forceSync() {
+		//todo
+	}
 </script>
 
 <nav class="navbar" bind:this={navElement}>
@@ -81,25 +108,40 @@
 			<button
 				bind:this={itemElements[item.id]}
 				class="nav-item {visuallyActiveItem === item.id ? 'active' : ''}"
-				on:click={() => handleItemClick(item.id)}
+				onclick={() => handleItemClick(item.id, item.href)}
 			>
 				{item.label}
 			</button>
 		{/each}
+
+		<!-- Force sync button -->
+		<button
+			class="nav-item sync-button"
+			onclick={() => forceSync()}
+			disabled={syncing}
+			title="Force update local DB from Congress API"
+		>
+			{#if syncing}
+				Syncing...
+			{:else}
+				Force Sync
+			{/if}
+		</button>
 	</div>
 </nav>
 
 <style>
 	.navbar {
 		display: flex;
-		justify-content: center;
-		align-items: center;
+		justify-content: flex-end;
+		align-items: flex-end;
 		padding: 1rem;
 		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+		margin-right: 2em;
+		position: sticky;
 	}
 
 	.navbar-container {
-		position: relative;
 		display: flex;
 		background: #2a2a2a;
 		border-radius: 25px;

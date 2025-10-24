@@ -1,3 +1,6 @@
 {
-	"/": []
+	"/": [],
+	"/table": [
+		"src/routes/table/+page.server.js"
+	]
 }

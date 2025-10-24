@@ -27,15 +27,19 @@ export {};
 
 declare module "$app/types" {
 	export interface AppTypes {
-		RouteId(): "/";
+		RouteId(): "/" | "/api" | "/bill" | "/bill/[id]" | "/table";
 		RouteParams(): {
-			
+			"/bill/[id]": { id: string }
 		};
 		LayoutParams(): {
-			"/": Record<string, never>
+			"/": { id?: string };
+			"/api": Record<string, never>;
+			"/bill": { id?: string };
+			"/bill/[id]": { id: string };
+			"/table": Record<string, never>
 		};
-		Pathname(): "/";
+		Pathname(): "/" | "/api" | "/api/" | "/bill" | "/bill/" | `/bill/${string}` & {} | `/bill/${string}/` & {} | "/table" | "/table/";
 		ResolvedPathname(): `${"" | `/${string}`}${ReturnType<AppTypes['Pathname']>}`;
-		Asset(): "/robots.txt" | string & {};
+		Asset(): "/logo.afphoto" | "/Logo.png" | "/Logo.svg" | "/robots.txt" | string & {};
 	}
 }
