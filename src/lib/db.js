@@ -172,7 +172,60 @@ export async function initDatabase() {
 																		reject(err);
 																	} else {
 																		console.log('Bill_text_versions table created or already exists');
-																		resolve(db);
+																		
+																		// Check if content column exists
+																		db.all(`PRAGMA table_info(bill_text_versions)`, (err, columns) => {
+																			if (err) {
+																				reject(err);
+																				return;
+																			}
+																			
+																			const hasContentColumn = columns.some(col => col.name === 'content');
+																			const hasContentFetchedColumn = columns.some(col => col.name === 'contentFetched');
+																			
+																			// Add content column if it doesn't exist
+																			if (!hasContentColumn) {
+																				db.run(`ALTER TABLE bill_text_versions ADD COLUMN content TEXT`, (err) => {
+																					if (err) {
+																						console.error('Error adding content column:', err);
+																					} else {
+																						console.log('✓ Content column added');
+																					}
+																					
+																					// Add contentFetched column if it doesn't exist
+																					if (!hasContentFetchedColumn) {
+																						db.run(`ALTER TABLE bill_text_versions ADD COLUMN contentFetched INTEGER DEFAULT 0`, (err) => {
+																							if (err) {
+																								console.error('Error adding contentFetched column:', err);
+																							} else {
+																								console.log('✓ ContentFetched column added');
+																							}
+																							resolve(db);
+																						});
+																					} else {
+																						console.log('ContentFetched column already exists');
+																						resolve(db);
+																					}
+																				});
+																			} else {
+																				console.log('Content column already exists');
+																				
+																				// Still check contentFetched column
+																				if (!hasContentFetchedColumn) {
+																					db.run(`ALTER TABLE bill_text_versions ADD COLUMN contentFetched INTEGER DEFAULT 0`, (err) => {
+																						if (err) {
+																							console.error('Error adding contentFetched column:', err);
+																						} else {
+																							console.log('✓ ContentFetched column added');
+																						}
+																						resolve(db);
+																					});
+																				} else {
+																					console.log('ContentFetched column already exists');
+																					resolve(db);
+																				}
+																			}
+																		});
 																	}
 																});
 															}
@@ -304,6 +357,24 @@ export async function getBillById(billId) {
 
 // Get text versions for a bill
 export async function getBillTextVersions(billId) {
+	// First check if the table exists
+	try {
+		const tableCheck = await query(`
+			SELECT name FROM sqlite_master 
+			WHERE type='table' AND name='bill_text_versions'
+		`);
+		
+		if (tableCheck.length === 0) {
+			console.error('❌ bill_text_versions table does not exist!');
+			return [];
+		} else {
+			console.log('✓ bill_text_versions table exists');
+		}
+	} catch (err) {
+		console.error('Error checking table existence:', err);
+		return [];
+	}
+	
 	const versions = await query(`
 		SELECT 
 			id,
@@ -311,7 +382,9 @@ export async function getBillTextVersions(billId) {
 			type,
 			date,
 			formatType,
-			url
+			url,
+			content,
+			contentFetched
 		FROM bill_text_versions
 		WHERE billId = ?
 		ORDER BY date DESC
@@ -327,14 +400,27 @@ export async function getBillTextVersions(billId) {
 
 // Execute a query that modifies data (INSERT, UPDATE, DELETE)
 export async function execute(sql, params = []) {
+	console.log('=== EXECUTE SQL ===');
+	console.log('SQL:', sql);
+	console.log('Params:', params);
+	
 	const db = await getDatabase();
 	
 	return new Promise((resolve, reject) => {
 		db.run(sql, params, function(err) {
-			db.close();
 			if (err) {
+				console.error('✗ SQL execution error:', err.message);
+				console.error('Failed SQL:', sql);
+				console.error('Failed params:', params);
+				db.close();
 				reject(err);
 			} else {
+				console.log('✓ SQL executed successfully');
+				console.log('  Last ID:', this.lastID);
+				console.log('  Changes:', this.changes);
+				console.log('==================');
+				
+				db.close();
 				// 'this' contains lastID and changes
 				resolve({
 					lastID: this.lastID,

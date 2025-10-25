@@ -2,24 +2,21 @@
 	let { data } = $props();
 	const { bill, textVersions } = data;
 
-	// Debug logging
-	console.log('Bill detail page loaded');
-	console.log('Bill ID:', bill.id);
-	console.log('Text versions received:', textVersions);
-	console.log('Text versions count:', textVersions?.length || 0);
+	// State for active tab
+	let activeVersionType = $state(null);
+	let activeFormat = $state(null);
+	let htmlContent = $state('');
+	let isLoadingHtml = $state(false);
 
 	// Group text versions by type (e.g., "Introduced in House", "Engrossed in House")
 	let versionsByType = $derived.by(() => {
 		if (!textVersions || textVersions.length === 0) {
-			console.log('No text versions to group');
 			return {};
 		}
 		
-		console.log('Grouping text versions...');
 		const grouped = {};
 		textVersions.forEach(version => {
 			const type = version.type || 'Unknown';
-			console.log(`Processing version: type=${type}, formatType=${version.formatType}, url=${version.url}`);
 			
 			if (!grouped[type]) {
 				grouped[type] = {
@@ -29,13 +26,71 @@
 			}
 			grouped[type].formats.push({
 				formatType: version.formatType,
-				url: version.url
+				url: version.url,
+				content: version.content,
+				contentFetched: version.contentFetched
 			});
 		});
 		
-		console.log('Grouped versions:', grouped);
 		return grouped;
 	});
+
+	// Set initial active version when data loads
+	$effect(() => {
+		if (!activeVersionType && Object.keys(versionsByType).length > 0) {
+			const firstType = Object.keys(versionsByType)[0];
+			activeVersionType = firstType;
+			
+			// Set first format as active
+			if (versionsByType[firstType].formats.length > 0) {
+				activeFormat = versionsByType[firstType].formats[0];
+			}
+		}
+	});
+
+	// Load HTML content when active format changes
+	$effect(() => {
+		if (!activeFormat) return;
+		
+		const formatType = activeFormat.formatType?.toUpperCase();
+		if (formatType === 'FORMATTED TEXT' || formatType?.includes('HTM')) {
+			isLoadingHtml = true;
+			
+			// Check if content is already stored in database
+			if (activeFormat.contentFetched && activeFormat.content) {
+				console.log('Using stored content from database');
+				htmlContent = activeFormat.content;
+				isLoadingHtml = false;
+			} else {
+				console.log('Fetching content via proxy');
+				htmlContent = '';
+				
+				// Use our API proxy to fetch the content (avoids CORS issues)
+				fetch(`/api/fetch-bill-text?url=${encodeURIComponent(activeFormat.url)}`)
+					.then(response => response.json())
+					.then(data => {
+						if (data.error) {
+							throw new Error(data.error);
+						}
+						htmlContent = data.content;
+						isLoadingHtml = false;
+					})
+					.catch(err => {
+						console.error('Error loading HTML:', err);
+						htmlContent = '<p>Error loading bill text. You can <a href="' + activeFormat.url + '" target="_blank" rel="noopener noreferrer">view it directly on Congress.gov</a>.</p>';
+						isLoadingHtml = false;
+					});
+			}
+		} else {
+			htmlContent = '';
+			isLoadingHtml = false;
+		}
+	});
+
+	function selectVersion(type, format) {
+		activeVersionType = type;
+		activeFormat = format;
+	}
 
 	function formatDate(dateString) {
 		if (!dateString) return 'N/A';
@@ -72,8 +127,8 @@
 	function getFormatIcon(formatType) {
 		const format = formatType?.toUpperCase();
 		if (format === 'PDF') return '📄';
-		if (format === 'HTML' || format === 'HTM') return '🌐';
-		if (format === 'XML') return '📋';
+		if (format === 'FORMATTED TEXT' || format?.includes('HTM')) return '🌐';
+		if (format?.includes('XML')) return '📋';
 		if (format === 'TXT') return '📝';
 		return '📎';
 	}
@@ -121,46 +176,6 @@
 		</div>
 	</div>
 
-	<!-- Bill Text Versions Section -->
-	{#if textVersions && textVersions.length > 0}
-		<section class="section text-versions">
-			<h2>Bill Text Versions</h2>
-			<p class="section-description">Download different versions of this bill in various formats</p>
-			
-			<div class="versions-list">
-				{#each Object.entries(versionsByType) as [type, versionData]}
-					<div class="version-card">
-						<div class="version-header">
-							<h3>{formatVersionType(type)}</h3>
-							{#if versionData.date}
-								<span class="version-date">{formatDate(versionData.date)}</span>
-							{/if}
-						</div>
-						
-						<div class="format-buttons">
-							{#each versionData.formats as format}
-								<a
-									href={format.url}
-									class="format-button"
-									target="_blank"
-									rel="noopener noreferrer"
-									download
-								>
-									<span class="format-icon">{getFormatIcon(format.formatType)}</span>
-									<span class="format-type">{format.formatType?.toUpperCase() || 'Download'}</span>
-								</a>
-							{/each}
-						</div>
-					</div>
-				{/each}
-			</div>
-		</section>
-	{:else}
-		<section class="section text-versions-unavailable">
-			<h2>Bill Text</h2>
-			<p class="unavailable-message">Text versions are being loaded or not yet available for this bill.</p>
-		</section>
-	{/if}
 
 	{#if bill.latestAction}
 		<section class="section latest-action">
@@ -250,6 +265,101 @@
 					</div>
 				{/each}
 			</div>
+		</section>
+	{/if}
+
+
+	<!-- Bill Text Versions Section -->
+	{#if textVersions && textVersions.length > 0}
+		<section class="section text-versions">
+			<h2>Bill Text Versions</h2>
+			<p class="section-description">View different versions of this bill text</p>
+			
+			<!-- Version Tabs -->
+			<div class="version-tabs">
+				{#each Object.entries(versionsByType) as [type, versionData]}
+					<div class="version-tab-group">
+						<div class="version-type-header">
+							<h3>{formatVersionType(type)}</h3>
+							{#if versionData.date}
+								<span class="version-date">{formatDate(versionData.date)}</span>
+							{/if}
+						</div>
+						
+						<div class="format-tabs">
+							{#each versionData.formats as format}
+								<button
+									class="format-tab"
+									class:active={activeVersionType === type && activeFormat === format}
+									onclick={() => selectVersion(type, format)}
+								>
+									<span class="format-icon">{getFormatIcon(format.formatType)}</span>
+									<span class="format-label">{format.formatType}</span>
+								</button>
+							{/each}
+						</div>
+					</div>
+				{/each}
+			</div>
+
+			<!-- Preview Area -->
+			{#if activeFormat}
+				<div class="preview-area">
+					<div class="preview-header">
+						<h3>Preview: {formatVersionType(activeVersionType)} - {activeFormat.formatType}</h3>
+						<a
+							href={activeFormat.url}
+							class="download-link"
+							target="_blank"
+							rel="noopener noreferrer"
+							download
+						>
+							<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+								<path d="M14 9V14H2V9H0V14C0 15.1 0.9 16 2 16H14C15.1 16 16 15.1 16 14V9H14Z" fill="currentColor"/>
+								<path d="M7 3V9.17L4.41 6.58L3 8L8 13L13 8L11.59 6.58L9 9.17V3H7Z" fill="currentColor"/>
+							</svg>
+							Download from Congress.gov
+						</a>
+					</div>
+
+					{#if isLoadingHtml}
+						<div class="loading-preview">
+							<div class="spinner"></div>
+							<p>Loading bill text...</p>
+						</div>
+					{:else if htmlContent}
+						<!-- Render HTML directly -->
+						<div class="html-content">
+							{@html htmlContent}
+						</div>
+					{:else}
+						<!-- For PDF and other formats, show download message -->
+						<div class="download-message">
+							<div class="format-icon-large">{getFormatIcon(activeFormat.formatType)}</div>
+							<h4>{activeFormat.formatType} Format</h4>
+							<p>This format cannot be previewed in the browser due to security restrictions.</p>
+							<a
+								href={activeFormat.url}
+								class="download-button"
+								target="_blank"
+								rel="noopener noreferrer"
+								download
+							>
+								<svg width="20" height="20" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+									<path d="M14 9V14H2V9H0V14C0 15.1 0.9 16 2 16H14C15.1 16 16 15.1 16 14V9H14Z" fill="currentColor"/>
+									<path d="M7 3V9.17L4.41 6.58L3 8L8 13L13 8L11.59 6.58L9 9.17V3H7Z" fill="currentColor"/>
+								</svg>
+								Download and View
+							</a>
+						</div>
+					{/if}
+				</div>
+			{/if}
+		</section>
+	{:else}
+		<section class="section text-versions-unavailable">
+			<h2>Bill Text</h2>
+			<p class="unavailable-message">Text versions are being loaded or not yet available for this bill.</p>
 		</section>
 	{/if}
 </div>
@@ -647,26 +757,21 @@
 		font-size: 0.95rem;
 	}
 
-	.versions-list {
+	.version-tabs {
 		display: flex;
 		flex-direction: column;
 		gap: 1.5rem;
+		margin-bottom: 2rem;
 	}
 
-	.version-card {
+	.version-tab-group {
 		background: rgba(0, 0, 0, 0.2);
 		border: 1px solid var(--border-color);
 		border-radius: var(--radius-md);
-		padding: 1.5rem;
-		transition: all 0.2s ease;
+		padding: 1.25rem;
 	}
 
-	.version-card:hover {
-		border-color: var(--accent);
-		box-shadow: 0 4px 12px rgba(255, 91, 88, 0.1);
-	}
-
-	.version-header {
+	.version-type-header {
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
@@ -675,7 +780,7 @@
 		gap: 0.5rem;
 	}
 
-	.version-header h3 {
+	.version-type-header h3 {
 		margin: 0;
 		font-size: 1.1rem;
 		color: var(--text-primary);
@@ -687,34 +792,38 @@
 		font-weight: 400;
 	}
 
-	.format-buttons {
+	.format-tabs {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.75rem;
 	}
 
-	.format-button {
+	.format-tab {
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
 		padding: 0.6rem 1.2rem;
 		background: var(--bg-tertiary);
-		border: 1px solid var(--border-color);
+		border: 2px solid var(--border-color);
 		border-radius: var(--radius-sm);
 		color: var(--text-primary);
-		text-decoration: none;
 		font-size: 0.9rem;
 		font-weight: 500;
 		transition: all 0.2s ease;
 		cursor: pointer;
 	}
 
-	.format-button:hover {
+	.format-tab:hover {
+		border-color: var(--accent);
+		transform: translateY(-2px);
+		box-shadow: 0 4px 8px rgba(255, 91, 88, 0.2);
+	}
+
+	.format-tab.active {
 		background: var(--accent);
 		border-color: var(--accent);
 		color: #ffffff;
-		transform: translateY(-2px);
-		box-shadow: 0 4px 8px rgba(255, 91, 88, 0.2);
+		box-shadow: 0 4px 12px rgba(255, 91, 88, 0.3);
 	}
 
 	.format-icon {
@@ -722,9 +831,169 @@
 		line-height: 1;
 	}
 
-	.format-type {
+	.format-label {
 		font-weight: 600;
 		letter-spacing: 0.05em;
+	}
+
+	.preview-area {
+		background: rgba(0, 0, 0, 0.3);
+		border: 1px solid var(--border-color);
+		border-radius: var(--radius-md);
+		overflow: hidden;
+	}
+
+	.preview-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 1rem 1.5rem;
+		background: rgba(0, 0, 0, 0.3);
+		border-bottom: 1px solid var(--border-color);
+		flex-wrap: wrap;
+		gap: 1rem;
+	}
+
+	.preview-header h3 {
+		margin: 0;
+		font-size: 1rem;
+		color: var(--text-primary);
+	}
+
+	.download-link {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.5rem 1rem;
+		background: var(--accent);
+		border-radius: var(--radius-sm);
+		color: #ffffff;
+		text-decoration: none;
+		font-size: 0.9rem;
+		font-weight: 600;
+		transition: all 0.2s ease;
+	}
+
+	.download-link:hover {
+		background: #ff4845;
+		transform: translateY(-2px);
+		box-shadow: 0 4px 8px rgba(255, 91, 88, 0.3);
+	}
+
+	.preview-iframe {
+		width: 100%;
+		height: 800px;
+		border: none;
+		background: white;
+	}
+
+	.html-content {
+		padding: 2rem;
+		background: white;
+		color: #000;
+		max-height: 800px;
+		overflow-y: auto;
+	}
+
+	.html-content :global(p) {
+		line-height: 1.8;
+		margin: 1rem 0;
+	}
+
+	.html-content :global(h1),
+	.html-content :global(h2),
+	.html-content :global(h3) {
+		margin-top: 2rem;
+		margin-bottom: 1rem;
+		color: #000;
+	}
+
+	.html-content :global(pre) {
+		background: #f5f5f5;
+		padding: 1rem;
+		border-radius: 4px;
+		overflow-x: auto;
+		white-space: pre-wrap;
+		word-wrap: break-word;
+	}
+
+	.loading-preview {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		padding: 4rem 2rem;
+		gap: 1rem;
+	}
+
+	.loading-preview p {
+		color: var(--text-secondary);
+		font-size: 1rem;
+	}
+
+	.download-message {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		padding: 4rem 2rem;
+		gap: 1.5rem;
+		text-align: center;
+	}
+
+	.format-icon-large {
+		font-size: 4rem;
+		line-height: 1;
+		opacity: 0.8;
+	}
+
+	.download-message h4 {
+		margin: 0;
+		font-size: 1.5rem;
+		color: var(--text-primary);
+	}
+
+	.download-message p {
+		margin: 0;
+		color: var(--text-secondary);
+		font-size: 1rem;
+		max-width: 500px;
+	}
+
+	.download-button {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 1rem 2rem;
+		background: var(--accent);
+		border-radius: var(--radius-md);
+		color: #ffffff;
+		text-decoration: none;
+		font-size: 1.1rem;
+		font-weight: 600;
+		transition: all 0.2s ease;
+		margin-top: 1rem;
+	}
+
+	.download-button:hover {
+		background: #ff4845;
+		transform: translateY(-2px);
+		box-shadow: 0 6px 16px rgba(255, 91, 88, 0.4);
+	}
+
+	.spinner {
+		width: 40px;
+		height: 40px;
+		border: 4px solid var(--border-color);
+		border-top-color: var(--accent);
+		border-radius: 50%;
+		animation: spin 0.8s linear infinite;
+	}
+
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
 	}
 
 	.text-versions-unavailable {
@@ -765,19 +1034,33 @@
 			grid-template-columns: 1fr;
 		}
 
-		.version-header {
+		.version-type-header {
 			flex-direction: column;
 			align-items: flex-start;
 		}
 
-		.format-buttons {
+		.format-tabs {
 			width: 100%;
 		}
 
-		.format-button {
+		.format-tab {
 			flex: 1;
 			justify-content: center;
 			min-width: 100px;
+		}
+
+		.preview-iframe {
+			height: 600px;
+		}
+
+		.html-content {
+			padding: 1rem;
+			max-height: 600px;
+		}
+
+		.preview-header {
+			flex-direction: column;
+			align-items: flex-start;
 		}
 	}
 </style>
