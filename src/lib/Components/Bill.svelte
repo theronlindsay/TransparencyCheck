@@ -6,17 +6,39 @@
 		id = '',
 		number = '',
 		title = '',
-		sponsor = '',
+		sponsors = [],
 		committee = '',
 		statusTag = '',
 		latestAction = '',
 		updatedAt = '',
-		fullTextUrl = '',
-		onclick = null,
-		onLearnMore = null
+		onclick = null
 	} = $props();
 
 	let isHovered = $state(false);
+
+	// Format sponsor display - show first sponsor's name and party
+	function formatSponsor(sponsors) {
+		if (!sponsors || sponsors.length === 0) return 'Unknown';
+		
+		const mainSponsor = sponsors[0];
+		const name = `${mainSponsor.firstName || ''} ${mainSponsor.lastName || ''}`.trim();
+		const party = mainSponsor.party ? ` [${mainSponsor.party}]` : '';
+		
+		return name + party;
+	}
+
+	// Extract text from latestAction object
+	function getLatestActionText(latestAction) {
+		if (!latestAction) return 'No recent action';
+		
+		// If it's already a string, return it
+		if (typeof latestAction === 'string') return latestAction;
+		
+		// If it's an object with text property, return that
+		if (latestAction.text) return latestAction.text;
+		
+		return 'No recent action';
+	}
 
 	function formatDate(dateString) {
 		if (!dateString) return 'N/A';
@@ -32,36 +54,39 @@
 		}
 	}
 
-	function handleLearnMore(event) {
-		event.stopPropagation();
-		if (onLearnMore) {
-			onLearnMore(id);
+	function handleCardClick() {
+		if (onclick) {
+			onclick();
 		} else {
 			// Default behavior: navigate to bill detail page
 			goto(`/bill/${id}`);
 		}
 	}
 
-	function handleViewFullText(event) {
-		event.stopPropagation();
+	function handleKeydown(event) {
+		if (event.key === 'Enter' || event.key === ' ') {
+			event.preventDefault();
+			handleCardClick();
+		}
 	}
 
 </script>
 
-<article
+<div
 	class="bill-card"
 	class:hovered={isHovered}
 	onmouseenter={() => (isHovered = true)}
 	onmouseleave={() => (isHovered = false)}
-	onclick={onclick}
-	role={onclick ? 'button' : 'article'}
-	tabindex={onclick ? 0 : undefined}
->
+	onclick={handleCardClick}
+	onkeydown={handleKeydown}
+	role="button"
+	tabindex="0"
+> 
 	<!-- Latest Action Overlay (shows on hover) -->
 	<div class="latest-action-overlay" class:visible={isHovered}>
 		<div class="overlay-content">
 			<span class="overlay-label">Latest Action</span>
-			<p class="overlay-text">{latestAction || 'No recent action'}</p>
+			<p class="overlay-text">{getLatestActionText(latestAction)}</p>
 		</div>
 	</div>
 
@@ -78,7 +103,7 @@
 	<div class="bill-details">
 		<div class="detail-row">
 			<span class="detail-label">Sponsor</span>
-			<span class="detail-value">{sponsor || 'Unknown'}</span>
+			<span class="detail-value">{formatSponsor(sponsors)}</span>
 		</div>
 
 		<div class="detail-row">
@@ -91,35 +116,7 @@
 			<span class="detail-value">{formatDate(updatedAt)}</span>
 		</div>
 	</div>
-
-	{#if fullTextUrl}
-		<a
-			href={fullTextUrl}
-			class="full-text-link"
-			target="_blank"
-			rel="noopener noreferrer"
-			onclick={handleViewFullText}
-		>
-			View Full Text →
-		</a>
-	{/if}
-
-	<!-- Action Buttons (always visible) -->
-	<div class="card-actions">
-		<button class="action-button primary" onclick={handleLearnMore}>Learn More</button>
-		{#if fullTextUrl}
-			<a
-				href={fullTextUrl}
-				class="action-button secondary"
-				target="_blank"
-				rel="noopener noreferrer"
-				onclick={handleViewFullText}
-			>
-				Full Text
-			</a>
-		{/if}
-	</div>
-</article>
+</div>
 
 <style>
 	.bill-card {
@@ -209,75 +206,6 @@
 		white-space: nowrap;
 	}
 
-	.full-text-link {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.5rem;
-		color: var(--accent);
-		font-size: 0.9rem;
-		font-weight: 600;
-		text-decoration: none;
-		margin-top: 0.5rem;
-		transition: all var(--transition-base);
-	}
-
-	.full-text-link:hover {
-		color: #ff5b58;
-		transform: translateX(4px);
-	}
-
-	/* Action Buttons */
-	.card-actions {
-		display: flex;
-		gap: 0.75rem;
-		margin-top: 1.25rem;
-		position: relative;
-		z-index: 20;
-	}
-
-	.action-button {
-		flex: 1;
-		padding: 0.75rem 1.25rem;
-		border-radius: var(--radius-md);
-		font-size: 0.9rem;
-		font-weight: 600;
-		text-align: center;
-		text-decoration: none;
-		cursor: pointer;
-		transition: all var(--transition-base);
-		border: none;
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		gap: 0.5rem;
-	}
-
-	.action-button.primary {
-		background: linear-gradient(135deg, rgba(241, 58, 55, 0.2), rgba(241, 58, 55, 0.35));
-		color: var(--text-primary);
-		border: 1px solid rgba(241, 58, 55, 0.3);
-	}
-
-	.action-button.primary:hover {
-		background: linear-gradient(135deg, rgba(241, 58, 55, 0.3), rgba(241, 58, 55, 0.45));
-		border-color: rgba(241, 58, 55, 0.5);
-		transform: translateY(-2px);
-		box-shadow: 0 4px 12px rgba(241, 58, 55, 0.3);
-	}
-
-	.action-button.secondary {
-		background: var(--bg-elevated);
-		color: var(--text-primary);
-		border: 1px solid var(--border-color);
-	}
-
-	.action-button.secondary:hover {
-		background: rgba(255, 255, 255, 0.05);
-		border-color: rgba(255, 255, 255, 0.15);
-		transform: translateY(-2px);
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-	}
-
 	/* Latest Action Overlay */
 	.latest-action-overlay {
 		position: absolute;
@@ -342,14 +270,6 @@
 			text-align: left;
 		}
 
-		.card-actions {
-			flex-direction: column;
-		}
-
-		.action-button {
-			width: 100%;
-		}
-
 		.latest-action-overlay {
 			padding: 1.5rem;
 		}
@@ -371,11 +291,6 @@
 
 		.detail-label,
 		.detail-value {
-			font-size: 0.85rem;
-		}
-
-		.action-button {
-			padding: 0.65rem 1rem;
 			font-size: 0.85rem;
 		}
 	}

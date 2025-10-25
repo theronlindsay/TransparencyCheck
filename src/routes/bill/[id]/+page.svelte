@@ -1,6 +1,41 @@
 <script>
 	let { data } = $props();
-	const { bill, fullText } = data;
+	const { bill, textVersions } = data;
+
+	// Debug logging
+	console.log('Bill detail page loaded');
+	console.log('Bill ID:', bill.id);
+	console.log('Text versions received:', textVersions);
+	console.log('Text versions count:', textVersions?.length || 0);
+
+	// Group text versions by type (e.g., "Introduced in House", "Engrossed in House")
+	let versionsByType = $derived.by(() => {
+		if (!textVersions || textVersions.length === 0) {
+			console.log('No text versions to group');
+			return {};
+		}
+		
+		console.log('Grouping text versions...');
+		const grouped = {};
+		textVersions.forEach(version => {
+			const type = version.type || 'Unknown';
+			console.log(`Processing version: type=${type}, formatType=${version.formatType}, url=${version.url}`);
+			
+			if (!grouped[type]) {
+				grouped[type] = {
+					date: version.date,
+					formats: []
+				};
+			}
+			grouped[type].formats.push({
+				formatType: version.formatType,
+				url: version.url
+			});
+		});
+		
+		console.log('Grouped versions:', grouped);
+		return grouped;
+	});
 
 	function formatDate(dateString) {
 		if (!dateString) return 'N/A';
@@ -16,6 +51,31 @@
 		} catch {
 			return 'N/A';
 		}
+	}
+
+	function formatVersionType(type) {
+		// Convert type codes to readable names
+		const typeMap = {
+			'IH': 'Introduced in House',
+			'IS': 'Introduced in Senate',
+			'RH': 'Reported in House',
+			'RS': 'Reported in Senate',
+			'EH': 'Engrossed in House',
+			'ES': 'Engrossed in Senate',
+			'ENR': 'Enrolled',
+			'RDS': 'Received in Senate',
+			'RDH': 'Received in House'
+		};
+		return typeMap[type] || type;
+	}
+
+	function getFormatIcon(formatType) {
+		const format = formatType?.toUpperCase();
+		if (format === 'PDF') return '📄';
+		if (format === 'HTML' || format === 'HTM') return '🌐';
+		if (format === 'XML') return '📋';
+		if (format === 'TXT') return '📝';
+		return '📎';
 	}
 </script>
 
@@ -43,50 +103,62 @@
 				<span class="meta-value">{formatDate(bill.updatedAt)}</span>
 			</div>
 		</div>
+
+		<!-- Action Buttons -->
+		<div class="action-buttons">
+			<a
+				href={`https://www.congress.gov/bill/${bill.number?.toLowerCase().replace(/(\d+)/, '$1')}`}
+				class="button primary"
+				target="_blank"
+				rel="noopener noreferrer"
+			>
+				<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+					<path d="M14 9V14H2V9H0V14C0 15.1 0.9 16 2 16H14C15.1 16 16 15.1 16 14V9H14Z" fill="currentColor"/>
+					<path d="M13 5L11.59 6.41L9 3.83V12H7V3.83L4.41 6.41L3 5L8 0L13 5Z" fill="currentColor"/>
+				</svg>
+				View on Congress.gov
+			</a>
+		</div>
 	</div>
 
-	{#if fullText?.available}
-		<section class="section full-text">
-			<div class="section-header">
-				<h2>Full Bill Text</h2>
-				{#if fullText.sourceUrl}
-					<a
-						href={fullText.sourceUrl}
-						class="source-link"
-						target="_blank"
-						rel="noopener noreferrer"
-					>
-						View on Congress.gov →
-					</a>
-				{/if}
-			</div>
+	<!-- Bill Text Versions Section -->
+	{#if textVersions && textVersions.length > 0}
+		<section class="section text-versions">
+			<h2>Bill Text Versions</h2>
+			<p class="section-description">Download different versions of this bill in various formats</p>
 			
-			{#if fullText.format}
-				<p class="format-info">Format: {fullText.format.toUpperCase()}</p>
-			{/if}
-
-			<div class="bill-text-content">
-				{@html fullText.html}
+			<div class="versions-list">
+				{#each Object.entries(versionsByType) as [type, versionData]}
+					<div class="version-card">
+						<div class="version-header">
+							<h3>{formatVersionType(type)}</h3>
+							{#if versionData.date}
+								<span class="version-date">{formatDate(versionData.date)}</span>
+							{/if}
+						</div>
+						
+						<div class="format-buttons">
+							{#each versionData.formats as format}
+								<a
+									href={format.url}
+									class="format-button"
+									target="_blank"
+									rel="noopener noreferrer"
+									download
+								>
+									<span class="format-icon">{getFormatIcon(format.formatType)}</span>
+									<span class="format-type">{format.formatType?.toUpperCase() || 'Download'}</span>
+								</a>
+							{/each}
+						</div>
+					</div>
+				{/each}
 			</div>
-
-			{#if fullText.fetchedAt}
-				<p class="fetched-info">Fetched: {formatDate(fullText.fetchedAt)}</p>
-			{/if}
 		</section>
-	{:else if fullText && !fullText.available}
-		<section class="section full-text-unavailable">
-			<h2>Full Bill Text</h2>
-			<p class="unavailable-reason">{fullText.reason || 'Bill text is not available at this time.'}</p>
-			{#if fullText.downloadUrl}
-				<a
-					href={fullText.downloadUrl}
-					class="button secondary"
-					target="_blank"
-					rel="noopener noreferrer"
-				>
-					Download Document
-				</a>
-			{/if}
+	{:else}
+		<section class="section text-versions-unavailable">
+			<h2>Bill Text</h2>
+			<p class="unavailable-message">Text versions are being loaded or not yet available for this bill.</p>
 		</section>
 	{/if}
 
@@ -251,6 +323,51 @@
 		display: flex;
 		gap: 1rem;
 		margin-top: 1.5rem;
+	}
+
+	.action-buttons {
+		display: flex;
+		gap: 1rem;
+		margin-top: 1.5rem;
+		flex-wrap: wrap;
+	}
+
+	.button {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.875rem 1.5rem;
+		border-radius: var(--radius-md);
+		font-size: 1rem;
+		font-weight: 600;
+		text-decoration: none;
+		cursor: pointer;
+		transition: all var(--transition-base);
+		border: none;
+	}
+
+	.button.primary {
+		background: var(--accent);
+		color: white;
+		border: 1px solid var(--accent);
+	}
+
+	.button.primary:hover {
+		background: #ff5b58;
+		transform: translateY(-2px);
+		box-shadow: 0 6px 20px rgba(241, 58, 55, 0.4);
+	}
+
+	.button.secondary {
+		background: rgba(241, 58, 55, 0.1);
+		color: var(--text-primary);
+		border: 1px solid rgba(241, 58, 55, 0.3);
+	}
+
+	.button.secondary:hover {
+		background: rgba(241, 58, 55, 0.2);
+		border-color: rgba(241, 58, 55, 0.5);
+		transform: translateY(-2px);
 	}
 
 	.section {
@@ -512,6 +629,118 @@
 		font-size: 1.05rem;
 	}
 
+	/* Text Versions Styles */
+	.text-versions {
+		padding: 2rem;
+		background: var(--bg-secondary);
+		border-radius: var(--radius-lg);
+		border: 1px solid var(--border-color);
+	}
+
+	.text-versions h2 {
+		margin: 0 0 0.5rem 0;
+	}
+
+	.section-description {
+		color: var(--text-secondary);
+		margin: 0 0 2rem 0;
+		font-size: 0.95rem;
+	}
+
+	.versions-list {
+		display: flex;
+		flex-direction: column;
+		gap: 1.5rem;
+	}
+
+	.version-card {
+		background: rgba(0, 0, 0, 0.2);
+		border: 1px solid var(--border-color);
+		border-radius: var(--radius-md);
+		padding: 1.5rem;
+		transition: all 0.2s ease;
+	}
+
+	.version-card:hover {
+		border-color: var(--accent);
+		box-shadow: 0 4px 12px rgba(255, 91, 88, 0.1);
+	}
+
+	.version-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 1rem;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+	}
+
+	.version-header h3 {
+		margin: 0;
+		font-size: 1.1rem;
+		color: var(--text-primary);
+	}
+
+	.version-date {
+		font-size: 0.85rem;
+		color: var(--text-secondary);
+		font-weight: 400;
+	}
+
+	.format-buttons {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.75rem;
+	}
+
+	.format-button {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.6rem 1.2rem;
+		background: var(--bg-tertiary);
+		border: 1px solid var(--border-color);
+		border-radius: var(--radius-sm);
+		color: var(--text-primary);
+		text-decoration: none;
+		font-size: 0.9rem;
+		font-weight: 500;
+		transition: all 0.2s ease;
+		cursor: pointer;
+	}
+
+	.format-button:hover {
+		background: var(--accent);
+		border-color: var(--accent);
+		color: #ffffff;
+		transform: translateY(-2px);
+		box-shadow: 0 4px 8px rgba(255, 91, 88, 0.2);
+	}
+
+	.format-icon {
+		font-size: 1.2rem;
+		line-height: 1;
+	}
+
+	.format-type {
+		font-weight: 600;
+		letter-spacing: 0.05em;
+	}
+
+	.text-versions-unavailable {
+		padding: 2rem;
+		background: var(--bg-secondary);
+		border-radius: var(--radius-lg);
+		border: 1px solid var(--border-color);
+		text-align: center;
+	}
+
+	.unavailable-message {
+		color: var(--text-secondary);
+		margin: 0.5rem 0 0 0;
+		font-size: 0.95rem;
+	}
+
 	/* Responsive Design */
 	@media (max-width: 768px) {
 		.bill-detail-page {
@@ -534,6 +763,21 @@
 		.votes-grid,
 		.news-grid {
 			grid-template-columns: 1fr;
+		}
+
+		.version-header {
+			flex-direction: column;
+			align-items: flex-start;
+		}
+
+		.format-buttons {
+			width: 100%;
+		}
+
+		.format-button {
+			flex: 1;
+			justify-content: center;
+			min-width: 100px;
 		}
 	}
 </style>

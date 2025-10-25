@@ -2,6 +2,20 @@
 	import Bill from '$lib/Components/Bill.svelte';
 
 	let { data } = $props();
+
+	// Store the resolved bills data
+	let billsData = $state([]);
+
+	// Watch for when the promise resolves
+	$effect(() => {
+		if (data.bills && data.bills.then) {
+			data.bills.then(bills => {
+				billsData = bills;
+			});
+		} else if (data.bills) {
+			billsData = data.bills;
+		}
+	});
 </script>
 
 <div class="content">
@@ -13,31 +27,40 @@
 	<section class="recent-bills-section">
 		<h3>Recently Updated Bills</h3>
 
-		{#if data.error}
+		{#await data.bills}
+			<!-- Loading state -->
+			<div class="loading-message">
+				<div class="spinner"></div>
+				<p>Loading bills from Congress.gov...</p>
+			</div>
+		{:then}
+			<!-- Success state -->
+			{#if !billsData || billsData.length === 0}
+				<div class="empty-message">
+					<p>No bills found in the database.</p>
+				</div>
+			{:else}
+				<div class="bills-grid">
+					{#each billsData as bill}
+						<Bill
+							id={bill.id}
+							number={bill.number}
+							title={bill.title}
+							sponsors={bill.sponsors}
+							committee={bill.primaryCommitteeName || 'Unassigned'}
+							statusTag={bill.statusTag}
+							latestAction={bill.latestAction}
+							updatedAt={bill.updateDate}
+						/>
+					{/each}
+				</div>
+			{/if}
+		{:catch error}
+			<!-- Error state -->
 			<div class="error-message">
-				<p>Error loading bills: {data.error}</p>
+				<p>Error loading bills: {error.message}</p>
 			</div>
-		{:else if data.bills.length === 0}
-			<div class="empty-message">
-				<p>No bills found in the database.</p>
-			</div>
-		{:else}
-			<div class="bills-grid">
-				{#each data.bills as bill}
-					<Bill
-						id={bill.id}
-						number={bill.number}
-						title={bill.title}
-						sponsor={bill.sponsor}
-						committee={bill.committee}
-						statusTag={bill.statusTag}
-						latestAction={bill.latestAction}
-						updatedAt={bill.updatedAt}
-						fullTextUrl={bill.fullTextUrl}
-					/>
-				{/each}
-			</div>
-		{/if}
+		{/await}
 	</section>
 </div>
 
@@ -78,13 +101,36 @@
 	}
 
 	.error-message,
-	.empty-message {
+	.empty-message,
+	.loading-message {
 		padding: 2rem;
 		background: var(--bg-secondary);
 		border-radius: var(--radius-lg);
 		text-align: center;
 		color: var(--text-secondary);
 		border: 1px solid var(--border-color);
+	}
+
+	.loading-message {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 1rem;
+	}
+
+	.spinner {
+		width: 40px;
+		height: 40px;
+		border: 4px solid var(--border-color);
+		border-top-color: var(--accent);
+		border-radius: 50%;
+		animation: spin 1s linear infinite;
+	}
+
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
 	}
 
 	/* Responsive Design */

@@ -6,17 +6,19 @@
 	// Props for customization
 	let { items = [
 		{ id: 'home', label: 'Home', active: true, href: '/' },
-		{ id: 'table', label: 'Table', active: false, href: '/table' },
-		{ id: 'api-demo', label: 'API Demo', active: false, href: '/api-demo' },
-		{ id: 'bills', label: 'Bills', active: false, href: '/bills' },
-		{ id: 'recent', label: 'Recent', active: false, href: '/recent' },
+		{ id: 'bills', label: 'Bills', active: false, href: '/bill' },
 		{ id: 'heirarchy', label: 'Heirarchy', active: false, href: '/heirarchy' },
 		{ id: 'chat', label: 'Chat', active: false, href: '/chat' }
 	] } = $props();
 
 	let activeItem = $derived.by(() => {
 		const currentPath = $page.url.pathname;
-		const matchedItem = items.find(item => item.href === currentPath);
+		// Try exact match first
+		let matchedItem = items.find(item => item.href === currentPath);
+		// If no exact match, try partial match (e.g., /bill/HR1 matches /bill)
+		if (!matchedItem) {
+			matchedItem = items.find(item => item.href !== '/' && currentPath.startsWith(item.href));
+		}
 		return matchedItem?.id || items[0]?.id;
 	});
 	
@@ -83,16 +85,6 @@
 		window.addEventListener('resize', handleResize);
 		return () => window.removeEventListener('resize', handleResize);
 	});
-
-
-
-	//Force Update Logic 
-	// Sync control for the navbar button
-	let syncing = $state(false);
-
-	async function forceSync() {
-		//todo
-	}
 </script>
 
 <nav class="navbar" bind:this={navElement}>
@@ -113,20 +105,6 @@
 				{item.label}
 			</button>
 		{/each}
-
-		<!-- Force sync button -->
-		<button
-			class="nav-item sync-button"
-			onclick={() => forceSync()}
-			disabled={syncing}
-			title="Force update local DB from Congress API"
-		>
-			{#if syncing}
-				Syncing...
-			{:else}
-				Force Sync
-			{/if}
-		</button>
 	</div>
 </nav>
 
@@ -170,7 +148,7 @@
 		background: none;
 		border: none;
 		color: #ffffff;
-		padding: 12px 20px;
+		padding: 10px 15px;
 		border-radius: 20px;
 		font-size: 14px;
 		font-weight: 700;
