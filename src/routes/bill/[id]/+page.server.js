@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { getBillById, getBillTextVersions, execute, query } from '$lib/db.js';
+import { getBillById, getBillTextVersions, getBillActions, execute, query } from '$lib/db.js';
 import { CONGRESS_API_KEY } from '$env/static/private';
 
 export async function load({ params }) {
@@ -44,15 +44,21 @@ export async function load({ params }) {
 			latestAction: getLatestActionText(billData.latestAction),
 			summary: billData.summaries || null,
 			summaryLong: null, // Not currently in database
-			statusTag: billData.billType?.toUpperCase() || null,
+			status: billData.status || null,
+			statusTag: billData.status || billData.billType?.toUpperCase() || null,
 			votes: [], // Not currently in database
 			schedule: [], // Not currently in database
 			news: [] // Not currently in database
 		};
 
+		// Fetch bill actions
+		const actions = await getBillActions(params.id);
+		console.log(`Fetched ${actions.length} actions for bill ${params.id}`);
+
 		return {
 			bill,
-			textVersions
+			textVersions,
+			actions
 		};
 	} catch (err) {
 		console.error('Error loading bill:', err);

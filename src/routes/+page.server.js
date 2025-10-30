@@ -1,5 +1,56 @@
 import { CONGRESS_API_KEY } from '$env/static/private';
-import {initDatabase, getDatabase, closeDatabase, execute, query} from '$lib/db.js'
+import { initDatabase, execute, query, saveBillActions } from '$lib/db.js';
+
+// Helper function to determine bill status from API data
+function determineBillStatus(bill) {
+	const latestActionText = bill.latestAction?.text?.toLowerCase() || '';
+	
+	// Check for enacted/became law
+	if (latestActionText.includes('became public law') || 
+	    latestActionText.includes('became private law') ||
+	    latestActionText.includes('signed by president')) {
+		return 'Enacted';
+	}
+	
+	// Check for vetoed
+	if (latestActionText.includes('vetoed') || 
+	    latestActionText.includes('veto message')) {
+		return 'Vetoed';
+	}
+	
+	// Check for failed
+	if (latestActionText.includes('failed') || 
+	    latestActionText.includes('rejected') ||
+	    latestActionText.includes('motion to proceed rejected')) {
+		return 'Failed';
+	}
+	
+	// Check for passed chambers
+	if (latestActionText.includes('passed senate') || 
+	    latestActionText.includes('received in the senate')) {
+		return 'Passed House';
+	}
+	
+	if (latestActionText.includes('passed house') || 
+	    latestActionText.includes('received in the house')) {
+		return 'Passed Senate';
+	}
+	
+	// Check for committee referral
+	if (latestActionText.includes('referred to') || 
+	    latestActionText.includes('committee on')) {
+		return 'In Committee';
+	}
+	
+	// Check for introduced
+	if (latestActionText.includes('introduced in') || 
+	    bill.introducedDate) {
+		return 'Introduced';
+	}
+	
+	// Default
+	return 'Active';
+}
 
 async function getRecentBills(amount){
 	let url = `https://api.congress.gov/v3/bill?api_key=${CONGRESS_API_KEY}&limit=${amount}`;
@@ -23,6 +74,14 @@ async function getBillCommittees(committeesUrl) {
 	const response = await fetch(url);
 	const data = await response.json();
 	return data.committees || [];
+}
+
+// Fetch actions for a bill from the actions URL
+async function getBillActionsFromAPI(actionsUrl) {
+	const url = `${actionsUrl}&api_key=${CONGRESS_API_KEY}`;
+	const response = await fetch(url);
+	const data = await response.json();
+	return data.actions || [];
 }
 
 export async function load() {
@@ -156,14 +215,17 @@ async function checkAndSyncInBackground() {
 		}
 		
 		try {
+			// Determine bill status
+			const billStatus = determineBillStatus(detailedBill);
+			
 			await execute(
 				`INSERT OR REPLACE INTO bills 
-				(id, billNumber, congress, type, introducedDate, latestAction, originChamber, originChamberCode, 
+				(id, billNumber, congress, type, introducedDate, latestAction, status, originChamber, originChamberCode, 
 				title, updateDate, updateDateIncludingText, url, legislationUrl, policyArea, primaryCommitteeCode,
 				actionsCount, actionsUrl, committeesCount, committeesUrl, cosponsorsCount, cosponsorsUrl, 
 				relatedBillsCount, relatedBillsUrl, sponsors, subjectsCount, subjectsUrl, 
 				summariesCount, summariesUrl, textVersionsCount, textVersionsUrl, titlesCount, titlesUrl) 
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 				[
 					billId,
 					detailedBill.number,
@@ -171,6 +233,7 @@ async function checkAndSyncInBackground() {
 					detailedBill.type || null,
 					detailedBill.introducedDate || null,
 					JSON.stringify(detailedBill.latestAction) || null,
+					billStatus,
 					detailedBill.originChamber || null,
 					detailedBill.originChamberCode || null,
 					detailedBill.title || null,
@@ -301,6 +364,26 @@ async function checkAndSyncInBackground() {
 					}
 				} catch (error) {
 					console.error(`Error fetching committees for ${billId}:`, error);
+				}
+			}
+
+			// Process actions
+			if (detailedBill.actions?.url) {
+				try {
+					const actions = await getBillActionsFromAPI(detailedBill.actions.url);
+					console.log(`Fetched ${actions.length} actions for ${billId}`);
+					
+					// Log first action to see structure
+					if (actions.length > 0) {
+						console.log('Sample action structure:', JSON.stringify(actions[0], null, 2));
+					}
+
+					if (actions.length > 0) {
+						await saveBillActions(billId, actions);
+						console.log(`Saved ${actions.length} actions for ${billId}`);
+					}
+				} catch (error) {
+					console.error(`Error fetching/saving actions for ${billId}:`, error);
 				}
 			}
 		} catch (error) {

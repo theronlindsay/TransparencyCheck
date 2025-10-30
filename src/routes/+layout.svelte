@@ -30,7 +30,7 @@
 			<img src="/Logo.png" alt="Transparency Check"/>
 		</div>
 
-		<Navbar />
+		<!-- <Navbar /> -->
 	</div>
 
 	

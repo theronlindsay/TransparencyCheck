@@ -90,15 +90,16 @@
 		</div>
 	</div>
 
-	<!-- Card Content -->
-	<div class="card-header">
-		<span class="bill-number">{number}</span>
-		{#if statusTag}
-			<span class="badge">{statusTag}</span>
-		{/if}
-	</div>
+	
 
-	<h3 class="bill-title">{title}</h3>
+	<h3 class="bill-title">
+		<div class="card-header">
+			<span class="bill-number">{number}</span>
+			{#if statusTag}
+				<span class="badge">{statusTag}</span>
+			{/if}
+		</div>{title}
+	</h3>
 
 	<div class="bill-details">
 		<div class="detail-row">
@@ -130,6 +131,9 @@
 		overflow: hidden;
 		backdrop-filter: var(--blur);
 		box-shadow: var(--shadow-soft);
+		display: flex;
+		flex-direction: column;
+		justify-content: space-between;
 	}
 
 	.bill-card:hover {

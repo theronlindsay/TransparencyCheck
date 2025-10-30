@@ -1,6 +1,8 @@
 <script>
+	import AISummarizer from '$lib/Components/AISummarizer.svelte';
+	
 	let { data } = $props();
-	const { bill, textVersions } = data;
+	const { bill, textVersions, actions } = data;
 
 	// State for active tab
 	let activeVersionType = $state(null);
@@ -100,8 +102,6 @@
 				month: 'long',
 				day: 'numeric',
 				year: 'numeric',
-				hour: '2-digit',
-				minute: '2-digit'
 			});
 		} catch {
 			return 'N/A';
@@ -134,17 +134,21 @@
 	}
 </script>
 
-<div class="bill-detail-page">
+<div class="page-container">
+	<!-- Main Content -->
+	<div class="main-content">
+		<div class="bill-detail-page">
 	<div class="bill-header">
 		<div class="header-top">
 			<span class="bill-number">{bill.number}</span>
-			{#if bill.statusTag}
-				<span class="badge">{bill.statusTag}</span>
-			{/if}
 		</div>
 		<h1 class="bill-title">{bill.title}</h1>
 		
 		<div class="bill-meta">
+			<div class="meta-item">
+				<span class="meta-label">Status</span>
+				<span class="badge" style="width: min-content;">{bill.statusTag || "Unknown"}</span>
+			</div>
 			<div class="meta-item">
 				<span class="meta-label">Sponsor</span>
 				<span class="meta-value">{bill.sponsor || 'Unknown'}</span>
@@ -181,6 +185,26 @@
 		<section class="section latest-action">
 			<h2>Latest Action</h2>
 			<p class="action-text">{bill.latestAction}</p>
+		</section>
+	{/if}
+
+	{#if actions && actions.length > 0}
+		<section class="section">
+			<h2>Legislative Actions</h2>
+			<p class="section-description">Complete timeline of all actions taken on this bill</p>
+			<div class="timeline">
+				{#each actions as action}
+					<div class="timeline-item">
+						{#if action.actionDate}
+							<span class="timeline-date">{formatDate(action.actionDate)}</span>
+						{/if}
+						<p class="timeline-text">{action.text || 'Action recorded'}</p>
+						{#if action.type}
+							<span class="action-type-badge">{action.type}</span>
+						{/if}
+					</div>
+				{/each}
+			</div>
 		</section>
 	{/if}
 
@@ -363,12 +387,71 @@
 		</section>
 	{/if}
 </div>
+</div>
+
+	<!-- AI Summarizer Sidebar -->
+	<aside class="sidebar">
+		<AISummarizer 
+			billNumber={bill.number} 
+			billTitle={bill.title}
+			billText={htmlContent}
+		/>
+	</aside>
+</div>
 
 <style>
-	.bill-detail-page {
-		max-width: 1200px;
+	.page-container {
+		display: grid;
+		grid-template-columns: 1fr 400px;
+		gap: 2rem;
+		max-width: 1600px;
 		margin: 0 auto;
 		padding: 2rem;
+		height: calc(100vh - 4rem); /* Full viewport height minus padding */
+		overflow: hidden; /* Prevent container from scrolling */
+	}
+
+	.main-content {
+		min-width: 0; /* Prevents grid overflow */
+		overflow-y: auto; /* Enable vertical scrolling */
+		overflow-x: hidden;
+		padding-right: 1rem; /* Space for scrollbar */
+	}
+
+	.sidebar {
+		min-width: 0; /* Prevents grid overflow */
+		overflow-y: auto; /* Enable vertical scrolling */
+		overflow-x: hidden;
+		padding-right: 0.5rem; /* Space for scrollbar */
+	}
+
+	/* Scrollbar styling for main content */
+	.main-content::-webkit-scrollbar,
+	.sidebar::-webkit-scrollbar {
+		width: 8px;
+	}
+
+	.main-content::-webkit-scrollbar-track,
+	.sidebar::-webkit-scrollbar-track {
+		background: rgba(0, 0, 0, 0.2);
+		border-radius: 4px;
+	}
+
+	.main-content::-webkit-scrollbar-thumb,
+	.sidebar::-webkit-scrollbar-thumb {
+		background: var(--border-color);
+		border-radius: 4px;
+	}
+
+	.main-content::-webkit-scrollbar-thumb:hover,
+	.sidebar::-webkit-scrollbar-thumb:hover {
+		background: var(--accent);
+	}
+
+	.bill-detail-page {
+		max-width: 100%;
+		margin: 0;
+		padding: 0;
 	}
 
 	.bill-header {
@@ -427,6 +510,12 @@
 		font-size: 1rem;
 		color: var(--text-primary);
 		font-weight: 500;
+	}
+
+	.status-value {
+		color: var(--accent);
+		font-weight: 600;
+		text-transform: capitalize;
 	}
 
 	.action-buttons {
@@ -613,6 +702,19 @@
 		color: var(--text-primary);
 		line-height: 1.6;
 		margin: 0;
+	}
+
+	.action-type-badge {
+		display: inline-block;
+		margin-top: 0.5rem;
+		padding: 0.25rem 0.75rem;
+		background: rgba(241, 58, 55, 0.1);
+		border: 1px solid rgba(241, 58, 55, 0.3);
+		border-radius: var(--radius-sm);
+		font-size: 0.8rem;
+		font-weight: 600;
+		color: var(--accent);
+		text-transform: capitalize;
 	}
 
 	.news-link {
@@ -1011,7 +1113,31 @@
 	}
 
 	/* Responsive Design */
+	@media (max-width: 1024px) {
+		.page-container {
+			grid-template-columns: 1fr;
+			gap: 2rem;
+			height: auto; /* Remove fixed height on mobile */
+			overflow: visible; /* Allow normal page scrolling */
+		}
+
+		.main-content,
+		.sidebar {
+			overflow-y: visible; /* Disable independent scrolling on mobile */
+			overflow-x: visible;
+			padding-right: 0; /* Remove scrollbar spacing */
+			height: auto;
+		}
+
+		.sidebar {
+			order: -1; /* Move sidebar to top on mobile */
+		}
+	}
+
 	@media (max-width: 768px) {
+		.page-container {
+			padding: 1.5rem;
+		}
 		.bill-detail-page {
 			padding: 1.5rem;
 		}

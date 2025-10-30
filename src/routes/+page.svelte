@@ -44,11 +44,11 @@
 					{#each billsData as bill}
 						<Bill
 							id={bill.id}
-							number={bill.number}
+							number={bill.billNumber || bill.number}
 							title={bill.title}
 							sponsors={bill.sponsors}
 							committee={bill.primaryCommitteeName || 'Unassigned'}
-							statusTag={bill.statusTag}
+							statusTag={bill.status || bill.statusTag}
 							latestAction={bill.latestAction}
 							updatedAt={bill.updateDate}
 						/>

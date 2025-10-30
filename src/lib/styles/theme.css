@@ -1,6 +1,7 @@
 :root {
     --bg-primary: #141212;
     --bg-secondary: rgba(36, 32, 32, 0.8);
+    --bg-tertiary: rgba(28, 24, 24, 0.65);
     --bg-elevated: rgba(28, 24, 24, 0.85);
     --border-color: rgba(255, 255, 255, 0.08);
     --accent: #f13a37;
