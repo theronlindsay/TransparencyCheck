@@ -30,6 +30,7 @@
 	},
 	"dependencies": {
 		"@sveltejs/adapter-node": "^5.3.3",
+		"openai": "^6.8.1",
 		"sqlite3": "^5.1.7"
 	}
 }

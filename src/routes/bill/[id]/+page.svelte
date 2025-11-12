@@ -9,6 +9,32 @@
 	let activeFormat = $state(null);
 	let htmlContent = $state('');
 	let isLoadingHtml = $state(false);
+	let isDragging = $state(false);
+	let mainContentWidth = $state(60); // Percentage width of main content
+
+	// Handle divider drag
+	function handleMouseDown() {
+		isDragging = true;
+	}
+
+	function handleMouseUp() {
+		isDragging = false;
+	}
+
+	function handleMouseMove(e) {
+		if (!isDragging) return;
+
+		const container = document.querySelector('.page-container');
+		if (!container) return;
+
+		const containerRect = container.getBoundingClientRect();
+		const newWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100;
+
+		// Constrain width between 40% and 85%
+		if (newWidth >= 40 && newWidth <= 85) {
+			mainContentWidth = newWidth;
+		}
+	}
 
 	// Group text versions by type (e.g., "Introduced in House", "Engrossed in House")
 	let versionsByType = $derived.by(() => {
@@ -134,7 +160,12 @@
 	}
 </script>
 
-<div class="page-container">
+<div class="page-container" style="--main-width: {mainContentWidth}%"
+	role="presentation"
+	onmousemove={handleMouseMove}
+	onmouseup={handleMouseUp}
+	onmouseleave={handleMouseUp}
+>
 	<!-- Main Content -->
 	<div class="main-content">
 		<div class="bill-detail-page">
@@ -386,8 +417,18 @@
 			<p class="unavailable-message">Text versions are being loaded or not yet available for this bill.</p>
 		</section>
 	{/if}
+	</div>
 </div>
-</div>
+
+	<!-- Resizable Divider -->
+	<button
+		class="divider"
+		class:active={isDragging}
+		onmousedown={handleMouseDown}
+		aria-label="Resize divider between content and sidebar"
+		title="Drag to resize panels"
+		tabindex="-1"
+	></button>
 
 	<!-- AI Summarizer Sidebar -->
 	<aside class="sidebar">
@@ -397,13 +438,11 @@
 			billText={htmlContent}
 		/>
 	</aside>
-</div>
-
-<style>
+</div><style>
 	.page-container {
 		display: grid;
-		grid-template-columns: 1fr 400px;
-		gap: 2rem;
+		grid-template-columns: calc(var(--main-width, 60%) - 0.5rem) 1rem calc(100% - var(--main-width, 60%) - 1.5rem);
+		gap: 0;
 		max-width: 1600px;
 		margin: 0 auto;
 		padding: 2rem;
@@ -423,6 +462,58 @@
 		overflow-y: auto; /* Enable vertical scrolling */
 		overflow-x: hidden;
 		padding-right: 0.5rem; /* Space for scrollbar */
+	}
+
+	.divider {
+		cursor: col-resize;
+		background: linear-gradient(90deg, transparent 0%, rgba(241, 58, 55, 0.05) 50%, transparent 100%);
+		padding: 0 0.25rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		transition: all 0.2s ease;
+		user-select: none;
+		border: 1px solid rgba(241, 58, 55, 0.1);
+		position: relative;
+	}
+
+	.divider::before {
+		content: ' ⋮⋮';
+		font-size: 1.2rem;
+		color: rgba(241, 58, 55, 0.3);
+		letter-spacing: 0.2rem;
+		transition: all 0.2s ease;
+		font-weight: 600;
+	}
+
+	.divider::after {
+		content: '';
+		position: absolute;
+		width: 100%;
+		height: 60px;
+		top: 50%;
+		transform: translateY(-50%);
+		pointer-events: none;
+	}
+
+	.divider:hover {
+		/* background: linear-gradient(90deg, transparent 0%, rgba(241, 58, 55, 0.25) 50%, transparent 100%); */
+		border-color: rgba(241, 58, 55, 0.25);
+	}
+
+	.divider:hover::before {
+		color: var(--accent);
+		text-shadow: 0 0 8px rgba(241, 58, 55, 0.3);
+	}
+
+	.divider.active {
+		/* background: linear-gradient(90deg, transparent 0%, rgba(241, 58, 55, 0.2) 50%, transparent 100%); */
+		border-color: rgba(241, 58, 55, 0.4);
+	}
+
+	.divider.active::before {
+		color: var(--accent);
+		text-shadow: 0 0 12px rgba(241, 58, 55, 0.5);
 	}
 
 	/* Scrollbar styling for main content */

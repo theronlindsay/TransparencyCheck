@@ -35,6 +35,32 @@ body {
     letter-spacing: 0.015em;
 }
 
+/* Dark scrollbars */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(20, 18, 18, 0.4);
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(241, 58, 55, 0.4);
+    border-radius: 5px;
+    border: 2px solid rgba(20, 18, 18, 0.4);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(241, 58, 55, 0.6);
+}
+
+/* Firefox scrollbar */
+* {
+    scrollbar-color: rgba(241, 58, 55, 0.4) rgba(20, 18, 18, 0.4);
+    scrollbar-width: thin;
+}
+
 h1,
 h2,
 h3,

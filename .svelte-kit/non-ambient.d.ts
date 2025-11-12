@@ -27,7 +27,7 @@ export {};
 
 declare module "$app/types" {
 	export interface AppTypes {
-		RouteId(): "/" | "/api" | "/api/fetch-bill-text" | "/bill" | "/bill/[id]" | "/table";
+		RouteId(): "/" | "/api" | "/api/fetch-bill-text" | "/api/openAI" | "/bill" | "/bill/[id]" | "/table";
 		RouteParams(): {
 			"/bill/[id]": { id: string }
 		};
@@ -35,11 +35,12 @@ declare module "$app/types" {
 			"/": { id?: string };
 			"/api": Record<string, never>;
 			"/api/fetch-bill-text": Record<string, never>;
+			"/api/openAI": Record<string, never>;
 			"/bill": { id?: string };
 			"/bill/[id]": { id: string };
 			"/table": Record<string, never>
 		};
-		Pathname(): "/" | "/api" | "/api/" | "/api/fetch-bill-text" | "/api/fetch-bill-text/" | "/bill" | "/bill/" | `/bill/${string}` & {} | `/bill/${string}/` & {} | "/table" | "/table/";
+		Pathname(): "/" | "/api" | "/api/" | "/api/fetch-bill-text" | "/api/fetch-bill-text/" | "/api/openAI" | "/api/openAI/" | "/bill" | "/bill/" | `/bill/${string}` & {} | `/bill/${string}/` & {} | "/table" | "/table/";
 		ResolvedPathname(): `${"" | `/${string}`}${ReturnType<AppTypes['Pathname']>}`;
 		Asset(): "/logo.afphoto" | "/Logo.png" | "/Logo.svg" | "/robots.txt" | string & {};
 	}

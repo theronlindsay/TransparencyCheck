@@ -1,4 +1,6 @@
 <script>
+	import { browser } from '$app/environment';
+
 	let { billNumber, billTitle, billText = '' } = $props();
 
 	// State for all options $state allows any reference to the variable in the UI to dynamically update whenever the variable changes.
@@ -8,9 +10,14 @@
 	let specificQuestion = $state('');
 	let focusTopic = $state('');
 	let generatedPrompt = $state('');
+	let aiResponse = $state('');
 	let showPrompt = $state(false);
+	let isLoading = $state(false);
 
-	function generatePrompt() {
+	async function generatePrompt() {
+		if (!browser) return; // Only run on client
+
+		isLoading = true;
 		let prompt = `Please summarize bill ${billNumber}\n\n`;
 
 		prompt += `Follow these parameters in your summary:\n\n`;
@@ -68,7 +75,39 @@
 		}
 
 		generatedPrompt = prompt;
-		showPrompt = true;
+
+		// Call API endpoint to send prompt to Node Server
+		try {
+			const response = await fetch('/api/openAI', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({ prompt })
+			});
+
+			if (!response.ok) {
+				console.error('Failed to send prompt to server:', response.statusText);
+				// Keep showing the prompt if API fails
+				return;
+			}
+
+			const data = await response.json();
+
+			if (data.success && data.response) {
+				// API call succeeded, show the response
+				aiResponse = data.response;
+			} else {
+				// If API succeeded but no response, keep showing the prompt
+				console.warn('No response from AI');
+			}
+		} catch (error) {
+			console.error('Error calling API endpoint:', error);
+			// Keep showing the prompt if there's an error
+		} finally {
+			isLoading = false;
+			showPrompt = true;
+		}
 	}
 
 	function resetForm() {
@@ -78,6 +117,7 @@
 		specificQuestion = '';
 		focusTopic = '';
 		generatedPrompt = '';
+		aiResponse = '';
 		showPrompt = false;
 	}
 </script>
@@ -148,8 +188,8 @@
 
 		<!-- Action Buttons -->
 		<div class="action-buttons">
-			<button onclick={generatePrompt} class="btn btn-primary">
-				Summarize
+			<button onclick={generatePrompt} disabled={isLoading} class="btn btn-primary">
+				{isLoading ? 'Generating...' : 'Summarize'}
 			</button>
 			{#if showPrompt}
 				<button onclick={resetForm} class="btn btn-secondary">
@@ -162,10 +202,10 @@
 		{#if showPrompt}
 			<div class="prompt-display">
 				<div class="prompt-header">
-					<h4>Generated Prompt</h4>
+					<h4>{aiResponse ? 'AI Summary' : 'Generated Prompt'}</h4>
 					<button
 						onclick={() => {
-							navigator.clipboard.writeText(generatedPrompt);
+							navigator.clipboard.writeText(aiResponse || generatedPrompt);
 						}}
 						class="btn btn-copy"
 						title="Copy to clipboard"
@@ -178,7 +218,7 @@
 					</button>
 				</div>
 				<div class="prompt-content">
-					<pre>{generatedPrompt}</pre>
+					<pre>{aiResponse || generatedPrompt}</pre>
 				</div>
 			</div>
 		{/if}
@@ -192,6 +232,7 @@
 		border-radius: var(--radius-lg);
 		padding: 1.5rem;
 		height: fit-content;
+		margin-left: 1em;
 	}
 
 	.summarizer-header {
@@ -392,6 +433,16 @@
 	.btn-copy:hover {
 		background: var(--accent);
 		color: white;
+	}
+
+	.btn:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+
+	.btn-primary:disabled:hover {
+		transform: none;
+		box-shadow: none;
 	}
 
 	.prompt-display {

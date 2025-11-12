@@ -27,6 +27,7 @@
  */
 declare module '$env/static/private' {
 	export const CONGRESS_API_KEY: string;
+	export const OPENAI_API_KEY: string;
 	export const ACSvcPort: string;
 	export const ALLUSERSPROFILE: string;
 	export const ANDROID_HOME: string;
@@ -46,15 +47,8 @@ declare module '$env/static/private' {
 	export const CUDA_PATH_V13_0: string;
 	export const DriverData: string;
 	export const EDITOR: string;
-	export const EFC_11816_1262719628: string;
-	export const EFC_11816_1592913036: string;
-	export const EFC_11816_2283032206: string;
-	export const EFC_11816_2775293581: string;
-	export const EFC_11816_3789132940: string;
-	export const FPS_BROWSER_APP_PROFILE_STRING: string;
-	export const FPS_BROWSER_USER_PROFILE_STRING: string;
+	export const EFC_12068_1592913036: string;
 	export const GIT_ASKPASS: string;
-	export const GIT_PAGER: string;
 	export const HOME: string;
 	export const HOMEDRIVE: string;
 	export const HOMEPATH: string;
@@ -126,6 +120,7 @@ declare module '$env/static/private' {
 	export const VSCODE_INJECTION: string;
 	export const VSCODE_PYTHON_AUTOACTIVATE_GUARD: string;
 	export const windir: string;
+	export const __COMPAT_LAYER: string;
 }
 
 /**
@@ -156,6 +151,7 @@ declare module '$env/static/public' {
 declare module '$env/dynamic/private' {
 	export const env: {
 		CONGRESS_API_KEY: string;
+		OPENAI_API_KEY: string;
 		ACSvcPort: string;
 		ALLUSERSPROFILE: string;
 		ANDROID_HOME: string;
@@ -175,15 +171,8 @@ declare module '$env/dynamic/private' {
 		CUDA_PATH_V13_0: string;
 		DriverData: string;
 		EDITOR: string;
-		EFC_11816_1262719628: string;
-		EFC_11816_1592913036: string;
-		EFC_11816_2283032206: string;
-		EFC_11816_2775293581: string;
-		EFC_11816_3789132940: string;
-		FPS_BROWSER_APP_PROFILE_STRING: string;
-		FPS_BROWSER_USER_PROFILE_STRING: string;
+		EFC_12068_1592913036: string;
 		GIT_ASKPASS: string;
-		GIT_PAGER: string;
 		HOME: string;
 		HOMEDRIVE: string;
 		HOMEPATH: string;
@@ -255,6 +244,7 @@ declare module '$env/dynamic/private' {
 		VSCODE_INJECTION: string;
 		VSCODE_PYTHON_AUTOACTIVATE_GUARD: string;
 		windir: string;
+		__COMPAT_LAYER: string;
 		[key: `PUBLIC_${string}`]: undefined;
 		[key: `${string}`]: string | undefined;
 	}
