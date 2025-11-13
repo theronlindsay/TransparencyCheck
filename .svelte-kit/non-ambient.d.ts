@@ -43,6 +43,6 @@ declare module "$app/types" {
 		};
 		Pathname(): "/" | "/api" | "/api/" | "/api/fetch-bill-text" | "/api/fetch-bill-text/" | "/api/openAI" | "/api/openAI/" | "/api/pdf" | "/api/pdf/" | "/bill" | "/bill/" | `/bill/${string}` & {} | `/bill/${string}/` & {} | "/table" | "/table/";
 		ResolvedPathname(): `${"" | `/${string}`}${ReturnType<AppTypes['Pathname']>}`;
-		Asset(): "/logo.afphoto" | "/Logo.png" | "/Logo.svg" | "/robots.txt" | string & {};
+		Asset(): "/logo.af" | "/logo.afphoto" | "/logo.af~lock~" | "/Logo.png" | "/Logo.svg" | "/robots.txt" | string & {};
 	}
 }

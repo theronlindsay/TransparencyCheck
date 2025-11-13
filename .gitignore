@@ -44,6 +44,6 @@ next-env.d.ts
 db
 
 #Svelte
-.sveltekit
+.svelte-kit
 
 .cache
