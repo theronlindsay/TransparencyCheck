@@ -487,17 +487,17 @@
 
 	/* Scrollbar styling */
 	.prompt-content::-webkit-scrollbar {
-		width: 8px;
+		width: 12px;
 	}
 
 	.prompt-content::-webkit-scrollbar-track {
 		background: rgba(0, 0, 0, 0.2);
-		border-radius: 4px;
+		border-radius: 6px;
 	}
 
 	.prompt-content::-webkit-scrollbar-thumb {
 		background: var(--border-color);
-		border-radius: 4px;
+		border-radius: 6px;
 	}
 
 	.prompt-content::-webkit-scrollbar-thumb:hover {

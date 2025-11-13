@@ -544,7 +544,6 @@
 		gap: 0;
 		max-width: 1600px;
 		margin: 0 auto;
-		padding: 2rem;
 		height: calc(100vh - 4rem); /* Full viewport height minus padding */
 		overflow: hidden; /* Prevent container from scrolling */
 	}
@@ -554,6 +553,7 @@
 		overflow-y: auto; /* Enable vertical scrolling */
 		overflow-x: hidden;
 		padding-right: 1rem; /* Space for scrollbar */
+		padding: 2em;
 	}
 
 	.sidebar {
@@ -561,6 +561,7 @@
 		overflow-y: auto; /* Enable vertical scrolling */
 		overflow-x: hidden;
 		padding-right: 0.5rem; /* Space for scrollbar */
+		padding: 0.5em;
 	}
 
 	.divider {
