@@ -36,7 +36,8 @@ export async function load({ params }) {
 		// Map the database fields to what the page expects
 		const bill = {
 			id: billData.id,
-			number: billData.billNumber,
+			number: formatBillNumber(billData.billNumber, billData.type),
+			congress: billData.congress,
 			title: billData.title,
 			sponsor: formatSponsor(billData.sponsors),
 			committee: billData.primaryCommitteeName || 'Unassigned',
@@ -192,6 +193,26 @@ function formatSponsor(sponsors) {
 	if (!sponsors || sponsors.length === 0) return 'Unknown';
 	const sponsor = sponsors[0];
 	return `${sponsor.firstName || ''} ${sponsor.lastName || ''}`.trim() || 'Unknown';
+}
+
+// Helper function to format bill number with type prefix
+function formatBillNumber(billNumber, billType) {
+	if (!billNumber) return '';
+	
+	// Map bill type codes to abbreviations
+	const typeMap = {
+		'HR': 'H.R.',
+		'S': 'S.',
+		'HRES': 'H.RES.',
+		'SRES': 'S.RES.',
+		'HJRES': 'H.J.RES.',
+		'SJRES': 'S.J.RES.',
+		'HCONRES': 'H.CON.RES.',
+		'SCONRES': 'S.CON.RES.'
+	};
+	
+	const prefix = typeMap[billType?.toUpperCase()] || billType || '';
+	return `${prefix}${billNumber}`;
 }
 
 // Helper function to extract text from latestAction object

@@ -27,7 +27,9 @@
 
 	<div class="navbar-container" class:scrolled={isScrolled}>
 		<div class="app-header">
-			<img src="/Logo.png" alt="Transparency Check"/>
+			<a href="/" class="logo-link">
+				<img src="/Logo.png" alt="Transparency Check"/>
+			</a>
 		</div>
 
 		<!-- <Navbar /> -->
@@ -53,6 +55,18 @@
 		align-items: center;
 		padding: 1rem 2rem;
 		transition: padding 0.3s ease;
+	}
+
+	.logo-link {
+		display: flex;
+		align-items: center;
+		text-decoration: none;
+		cursor: pointer;
+		transition: transform 0.2s ease;
+	}
+
+	.logo-link:hover {
+		transform: scale(1.02);
 	}
 
 	.app-header img {

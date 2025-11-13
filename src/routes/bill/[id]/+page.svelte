@@ -60,6 +60,15 @@
 			});
 		});
 		
+		// Sort formats to put PDF first
+		Object.keys(grouped).forEach(type => {
+			grouped[type].formats.sort((a, b) => {
+				const aIsPdf = a.formatType?.toUpperCase() === 'PDF' ? 0 : 1;
+				const bIsPdf = b.formatType?.toUpperCase() === 'PDF' ? 0 : 1;
+				return aIsPdf - bIsPdf;
+			});
+		});
+		
 		return grouped;
 	});
 
@@ -69,7 +78,7 @@
 			const firstType = Object.keys(versionsByType)[0];
 			activeVersionType = firstType;
 			
-			// Set first format as active
+			// Set first format as active (which is now PDF if available)
 			if (versionsByType[firstType].formats.length > 0) {
 				activeFormat = versionsByType[firstType].formats[0];
 			}
@@ -109,6 +118,26 @@
 						isLoadingHtml = false;
 					});
 			}
+		} else if (formatType?.includes('XML')) {
+			// For XML, fetch and display with formatting
+			isLoadingHtml = true;
+			htmlContent = '';
+			
+			fetch(`/api/fetch-bill-text?url=${encodeURIComponent(activeFormat.url)}`)
+				.then(response => response.json())
+				.then(data => {
+					if (data.error) {
+						throw new Error(data.error);
+					}
+					// Store XML content - will be displayed in pre tag
+					htmlContent = data.content;
+					isLoadingHtml = false;
+				})
+				.catch(err => {
+					console.error('Error loading XML:', err);
+					htmlContent = 'Error loading XML content. You can view it directly on Congress.gov.';
+					isLoadingHtml = false;
+				});
 		} else {
 			htmlContent = '';
 			isLoadingHtml = false;
@@ -158,6 +187,38 @@
 		if (format === 'TXT') return '📝';
 		return '📎';
 	}
+
+	function getCongressUrl(billNumber, congress) {
+		// Parse bill number like "H.R.3062", "S.1234", "HR3062", "S2392"
+		const match = billNumber?.match(/^([A-Z]+)\.?(\d+)$/i);
+		if (!match || !congress) {
+			console.warn(`Failed to parse bill number: ${billNumber}`);
+			return '';
+		}
+		
+		const billType = match[1].toLowerCase(); // "hr" or "s"
+		const billNum = match[2];
+		
+		// Format congress number as "119th-congress"
+		const congressFormatted = `${congress}th-congress`;
+		
+		// Map bill type codes to Congress.gov format
+		const typeMap = {
+			'hr': 'house-bill',
+			'hres': 'house-resolution',
+			'hjres': 'house-joint-resolution',
+			'hconres': 'house-concurrent-resolution',
+			's': 'senate-bill',
+			'sres': 'senate-resolution',
+			'sjres': 'senate-joint-resolution',
+			'sconres': 'senate-concurrent-resolution'
+		};
+		
+		const billTypeFormatted = typeMap[billType] || `${billType}-bill`;
+		const url = `https://www.congress.gov/bill/${congressFormatted}/${billTypeFormatted}/${billNum}`;
+		console.log(`Generated Congress URL: ${url}`);
+		return url;
+	}
 </script>
 
 <div class="page-container" style="--main-width: {mainContentWidth}%"
@@ -197,7 +258,7 @@
 		<!-- Action Buttons -->
 		<div class="action-buttons">
 			<a
-				href={`https://www.congress.gov/bill/${bill.number?.toLowerCase().replace(/(\d+)/, '$1')}`}
+				href={getCongressUrl(bill.number, bill.congress)}
 				class="button primary"
 				target="_blank"
 				rel="noopener noreferrer"
@@ -387,12 +448,50 @@
 						<div class="html-content">
 							{@html htmlContent}
 						</div>
+					{:else if activeFormat.formatType?.toUpperCase() === 'PDF'}
+						<!-- Embed PDF directly from local server -->
+						<iframe
+							src={`/api/pdf?url=${encodeURIComponent(activeFormat.url)}`}
+							class="preview-iframe"
+							title="PDF Preview"
+						></iframe>
+					{:else if activeFormat.formatType?.toUpperCase().includes('XML')}
+						<!-- Display XML with syntax highlighting -->
+						{#if isLoadingHtml}
+							<div class="loading-preview">
+								<div class="spinner"></div>
+								<p>Loading XML content...</p>
+							</div>
+						{:else if htmlContent}
+							<div class="xml-content">
+								<pre><code>{htmlContent}</code></pre>
+							</div>
+						{:else}
+							<div class="download-message">
+								<div class="format-icon-large">📋</div>
+								<h4>XML Format</h4>
+								<p>Unable to load XML content.</p>
+								<a
+									href={activeFormat.url}
+									class="download-button"
+									target="_blank"
+									rel="noopener noreferrer"
+									download
+								>
+									<svg width="20" height="20" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+										<path d="M14 9V14H2V9H0V14C0 15.1 0.9 16 2 16H14C15.1 16 16 15.1 16 14V9H14Z" fill="currentColor"/>
+										<path d="M7 3V9.17L4.41 6.58L3 8L8 13L13 8L11.59 6.58L9 9.17V3H7Z" fill="currentColor"/>
+									</svg>
+									Download XML
+								</a>
+							</div>
+						{/if}
 					{:else}
-						<!-- For PDF and other formats, show download message -->
+						<!-- For other formats, show download message -->
 						<div class="download-message">
 							<div class="format-icon-large">{getFormatIcon(activeFormat.formatType)}</div>
 							<h4>{activeFormat.formatType} Format</h4>
-							<p>This format cannot be previewed in the browser due to security restrictions.</p>
+							<p>This format cannot be previewed in the browser.</p>
 							<a
 								href={activeFormat.url}
 								class="download-button"
@@ -1108,6 +1207,33 @@
 		overflow-x: auto;
 		white-space: pre-wrap;
 		word-wrap: break-word;
+	}
+
+	.xml-content {
+		padding: 2rem;
+		background: rgba(0, 0, 0, 0.2);
+		max-height: 800px;
+		overflow: auto;
+	}
+
+	.xml-content pre {
+		margin: 0;
+		font-family: 'Courier New', Courier, monospace;
+		font-size: 0.9rem;
+		line-height: 1.6;
+		color: var(--text-primary);
+		white-space: pre-wrap;
+		word-wrap: break-word;
+		background: rgba(0, 0, 0, 0.3);
+		padding: 1.5rem;
+		border-radius: var(--radius-md);
+		border: 1px solid var(--border-color);
+		overflow-x: auto;
+	}
+
+	.xml-content code {
+		font-family: 'Courier New', Courier, monospace;
+		color: inherit;
 	}
 
 	.loading-preview {
