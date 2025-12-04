@@ -42,6 +42,10 @@
 		}
 	});
 
+	function handleRetry() {
+		window.location.reload();
+	}
+
 	// State for active tab
 	let activeVersionType = $state(null);
 	let activeFormat = $state(null);
@@ -227,14 +231,16 @@
 	}
 
 	function getCongressUrl(billNumber, congress) {
-		// Parse bill number like "H.R.3062", "S.1234", "HR3062", "S2392"
-		const match = billNumber?.match(/^([A-Z]+)\.?(\d+)$/i);
+		// Parse bill number like "H.R.3062", "S.1234", "HR3062", "S.RES.123", "H.J.RES.45"
+		// Remove all dots and spaces first, then match
+		const cleaned = billNumber?.replace(/[\.\s]/g, '').toUpperCase();
+		const match = cleaned?.match(/^([A-Z]+)(\d+)$/i);
 		if (!match || !congress) {
-			console.warn(`Failed to parse bill number: ${billNumber}`);
+			console.warn(`Failed to parse bill number: ${billNumber} (cleaned: ${cleaned})`);
 			return '';
 		}
 		
-		const billType = match[1].toLowerCase(); // "hr" or "s"
+		const billType = match[1].toLowerCase(); // "hr", "s", "hres", "hjres", etc.
 		const billNum = match[2];
 		
 		// Format congress number as "119th-congress"
@@ -264,10 +270,10 @@
 		<div class="loading-spinner"></div>
 		<p>Loading bill details...</p>
 	</div>
-{:else if error}
+{:else if loadError}
 	<div class="error-container">
-		<p class="error-message">{error}</p>
-		<button onclick={() => window.location.reload()}>Retry</button>
+		<p class="error-message">{loadError}</p>
+		<button onclick={handleRetry}>Retry</button>
 	</div>
 {:else if !bill}
 	<div class="error-container">
