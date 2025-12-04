@@ -38,6 +38,7 @@ declare module '$env/static/private' {
 	export const QT_IM_MODULES: string;
 	export const NODE: string;
 	export const LC_ADDRESS: string;
+	export const JAVA_HOME: string;
 	export const LC_NAME: string;
 	export const SSH_AUTH_SOCK: string;
 	export const MEMORY_PRESSURE_WRITE: string;
@@ -63,14 +64,15 @@ declare module '$env/static/private' {
 	export const GDM_LANG: string;
 	export const HOME: string;
 	export const USERNAME: string;
-	export const LC_PAPER: string;
 	export const LANG: string;
+	export const LC_PAPER: string;
 	export const XDG_CURRENT_DESKTOP: string;
 	export const npm_package_version: string;
 	export const PYTHONSTARTUP: string;
 	export const MEMORY_PRESSURE_WATCH: string;
 	export const WAYLAND_DISPLAY: string;
 	export const VIRTUAL_ENV_DISABLE_PROMPT: string;
+	export const VSCODE_JAVA_EXEC: string;
 	export const MANROFFOPT: string;
 	export const GIT_ASKPASS: string;
 	export const INVOCATION_ID: string;
@@ -84,8 +86,9 @@ declare module '$env/static/private' {
 	export const VSCODE_PYTHON_AUTOACTIVATE_GUARD: string;
 	export const npm_config_npm_version: string;
 	export const XDG_SESSION_CLASS: string;
-	export const TERM: string;
+	export const ANDROID_HOME: string;
 	export const LC_IDENTIFICATION: string;
+	export const TERM: string;
 	export const npm_package_name: string;
 	export const PYTHON_BASIC_REPL: string;
 	export const npm_config_prefix: string;
@@ -107,6 +110,7 @@ declare module '$env/static/private' {
 	export const LC_TIME: string;
 	export const VSCODE_GIT_ASKPASS_MAIN: string;
 	export const JOURNAL_STREAM: string;
+	export const VSCODE_JDWP_ADAPTER_ENDPOINTS: string;
 	export const XDG_DATA_DIRS: string;
 	export const GDK_BACKEND: string;
 	export const npm_config_noproxy: string;
@@ -166,6 +170,7 @@ declare module '$env/dynamic/private' {
 		QT_IM_MODULES: string;
 		NODE: string;
 		LC_ADDRESS: string;
+		JAVA_HOME: string;
 		LC_NAME: string;
 		SSH_AUTH_SOCK: string;
 		MEMORY_PRESSURE_WRITE: string;
@@ -191,14 +196,15 @@ declare module '$env/dynamic/private' {
 		GDM_LANG: string;
 		HOME: string;
 		USERNAME: string;
-		LC_PAPER: string;
 		LANG: string;
+		LC_PAPER: string;
 		XDG_CURRENT_DESKTOP: string;
 		npm_package_version: string;
 		PYTHONSTARTUP: string;
 		MEMORY_PRESSURE_WATCH: string;
 		WAYLAND_DISPLAY: string;
 		VIRTUAL_ENV_DISABLE_PROMPT: string;
+		VSCODE_JAVA_EXEC: string;
 		MANROFFOPT: string;
 		GIT_ASKPASS: string;
 		INVOCATION_ID: string;
@@ -212,8 +218,9 @@ declare module '$env/dynamic/private' {
 		VSCODE_PYTHON_AUTOACTIVATE_GUARD: string;
 		npm_config_npm_version: string;
 		XDG_SESSION_CLASS: string;
-		TERM: string;
+		ANDROID_HOME: string;
 		LC_IDENTIFICATION: string;
+		TERM: string;
 		npm_package_name: string;
 		PYTHON_BASIC_REPL: string;
 		npm_config_prefix: string;
@@ -235,6 +242,7 @@ declare module '$env/dynamic/private' {
 		LC_TIME: string;
 		VSCODE_GIT_ASKPASS_MAIN: string;
 		JOURNAL_STREAM: string;
+		VSCODE_JDWP_ADAPTER_ENDPOINTS: string;
 		XDG_DATA_DIRS: string;
 		GDK_BACKEND: string;
 		npm_config_noproxy: string;

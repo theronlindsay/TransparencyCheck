@@ -11,6 +11,7 @@
 		"prepare": "svelte-kit sync || echo ''",
 		"format": "prettier --write .",
 		"lint": "prettier --check . && eslint .",
+		"tauri": "tauri",
 		"tauri:build": "NO_STRIP=1 npx tauri build --bundles appimage",
 		"tauri:android": "npx tauri android build"
 	},

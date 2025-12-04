@@ -1,6 +1,16 @@
 import { json } from '@sveltejs/kit';
 import { initDatabase, query } from '$lib/db.js';
 
+const corsHeaders = {
+	'Access-Control-Allow-Origin': '*',
+	'Access-Control-Allow-Methods': 'GET, OPTIONS',
+	'Access-Control-Allow-Headers': 'Content-Type'
+};
+
+export async function OPTIONS() {
+	return new Response(null, { headers: corsHeaders });
+}
+
 export async function GET() {
 	try {
 		await initDatabase();
@@ -52,9 +62,9 @@ export async function GET() {
 				[]
 		}));
 
-		return json(bills);
+		return json(bills, { headers: corsHeaders });
 	} catch (error) {
 		console.error('Error fetching bills:', error);
-		return json({ error: error.message }, { status: 500 });
+		return json({ error: error.message }, { status: 500, headers: corsHeaders });
 	}
 }

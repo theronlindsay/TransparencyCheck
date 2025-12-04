@@ -10,9 +10,24 @@ const VPS_API_URL = 'https://transparencycheck.theronlindsay.dev';
 
 /**
  * Check if we're running in a Tauri environment
+ * Uses multiple detection methods for reliability
  */
 export function isTauri() {
-	return typeof window !== 'undefined' && window.__TAURI__ !== undefined;
+	if (typeof window === 'undefined') return false;
+	
+	// Check for Tauri API
+	if (window.__TAURI__) return true;
+	
+	// Check for Tauri internals (IPC)
+	if (window.__TAURI_IPC__) return true;
+	
+	// Check for tauri protocol in URL (Android uses this)
+	if (window.location.protocol === 'tauri:' || 
+	    window.location.protocol === 'https:' && window.location.hostname === 'tauri.localhost') {
+		return true;
+	}
+	
+	return false;
 }
 
 /**
