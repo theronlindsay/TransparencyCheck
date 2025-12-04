@@ -1,5 +1,4 @@
 <script>
-	export const ssr = false;
 	import { onMount } from 'svelte';
 	import favicon from '$lib/assets/favicon.svg';
 	import Navbar from '$lib/Components/Navbar.svelte';
