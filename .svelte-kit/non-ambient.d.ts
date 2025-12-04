@@ -27,13 +27,16 @@ export {};
 
 declare module "$app/types" {
 	export interface AppTypes {
-		RouteId(): "/" | "/api" | "/api/fetch-bill-text" | "/api/openAI" | "/api/pdf" | "/bill" | "/bill/[id]" | "/table";
+		RouteId(): "/" | "/api" | "/api/bills" | "/api/bills/[id]" | "/api/fetch-bill-text" | "/api/openAI" | "/api/pdf" | "/bill" | "/bill/[id]" | "/table";
 		RouteParams(): {
+			"/api/bills/[id]": { id: string };
 			"/bill/[id]": { id: string }
 		};
 		LayoutParams(): {
 			"/": { id?: string };
-			"/api": Record<string, never>;
+			"/api": { id?: string };
+			"/api/bills": { id?: string };
+			"/api/bills/[id]": { id: string };
 			"/api/fetch-bill-text": Record<string, never>;
 			"/api/openAI": Record<string, never>;
 			"/api/pdf": Record<string, never>;
@@ -41,8 +44,8 @@ declare module "$app/types" {
 			"/bill/[id]": { id: string };
 			"/table": Record<string, never>
 		};
-		Pathname(): "/" | "/api" | "/api/" | "/api/fetch-bill-text" | "/api/fetch-bill-text/" | "/api/openAI" | "/api/openAI/" | "/api/pdf" | "/api/pdf/" | "/bill" | "/bill/" | `/bill/${string}` & {} | `/bill/${string}/` & {} | "/table" | "/table/";
+		Pathname(): "/" | "/api" | "/api/" | "/api/bills" | "/api/bills/" | `/api/bills/${string}` & {} | `/api/bills/${string}/` & {} | "/api/fetch-bill-text" | "/api/fetch-bill-text/" | "/api/openAI" | "/api/openAI/" | "/api/pdf" | "/api/pdf/" | "/bill" | "/bill/" | `/bill/${string}` & {} | `/bill/${string}/` & {} | "/table" | "/table/";
 		ResolvedPathname(): `${"" | `/${string}`}${ReturnType<AppTypes['Pathname']>}`;
-		Asset(): "/logo.af" | "/logo.afphoto" | "/logo.af~lock~" | "/Logo.png" | "/Logo.svg" | "/robots.txt" | string & {};
+		Asset(): "/Logo.png" | "/Logo.svg" | "/logo.af" | "/logo.afphoto" | "/robots.txt" | string & {};
 	}
 }

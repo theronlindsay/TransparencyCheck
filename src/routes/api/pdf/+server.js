@@ -1,10 +1,7 @@
 import { json } from '@sveltejs/kit';
 import fs from 'fs/promises';
 import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import crypto from 'crypto';
 
 // Directory to store downloaded PDFs
 const PDF_CACHE_DIR = path.join(process.cwd(), '.cache', 'pdfs');
@@ -18,9 +15,9 @@ async function ensureCacheDir() {
 	}
 }
 
-// Generate a safe filename from URL
+// Generate a safe filename from URL using proper hash
 function generateFileName(url) {
-	const hash = Buffer.from(url).toString('base64').replace(/[^a-z0-9]/gi, '').substring(0, 32);
+	const hash = crypto.createHash('sha256').update(url).digest('hex').substring(0, 32);
 	return `${hash}.pdf`;
 }
 

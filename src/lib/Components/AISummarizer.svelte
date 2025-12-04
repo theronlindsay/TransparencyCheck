@@ -1,5 +1,6 @@
 <script>
 	import { browser } from '$app/environment';
+	import { apiUrl } from '$lib/config.js';
 
 	let { billNumber, billTitle, billText = '' } = $props();
 
@@ -78,7 +79,7 @@
 
 		// Call API endpoint to send prompt to Node Server
 		try {
-			const response = await fetch('/api/openAI', {
+			const response = await fetch(apiUrl('/api/openAI'), {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'

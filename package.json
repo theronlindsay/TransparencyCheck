@@ -10,13 +10,17 @@
 		"start": "node build",
 		"prepare": "svelte-kit sync || echo ''",
 		"format": "prettier --write .",
-		"lint": "prettier --check . && eslint ."
+		"lint": "prettier --check . && eslint .",
+		"tauri:build": "NO_STRIP=1 npx tauri build --bundles appimage",
+		"tauri:android": "npx tauri android build"
 	},
 	"devDependencies": {
 		"@eslint/compat": "^1.2.5",
 		"@eslint/js": "^9.22.0",
+		"@sveltejs/adapter-static": "^3.0.10",
 		"@sveltejs/kit": "^2.22.0",
 		"@sveltejs/vite-plugin-svelte": "^6.0.0",
+		"@tauri-apps/cli": "^2.9.5",
 		"@types/node": "^22",
 		"eslint": "^9.22.0",
 		"eslint-config-prettier": "^10.0.1",

@@ -1,8 +1,46 @@
 <script>
 	import AISummarizer from '$lib/Components/AISummarizer.svelte';
+	import { apiUrl, isTauri } from '$lib/config.js';
+	import { browser } from '$app/environment';
+	import { page } from '$app/stores';
 	
 	let { data } = $props();
-	const { bill, textVersions, actions } = data;
+	
+	// Reactive state for bill data (can be updated client-side in Tauri)
+	let bill = $state(data.bill);
+	let textVersions = $state(data.textVersions);
+	let actions = $state(data.actions);
+	let isLoading = $state(false);
+	let loadError = $state(null);
+
+	// Fetch bill data client-side when in Tauri
+	async function fetchBillFromAPI(billId) {
+		isLoading = true;
+		loadError = null;
+		try {
+			const response = await fetch(apiUrl(`/api/bills/${billId}`));
+			if (!response.ok) {
+				throw new Error(`Failed to fetch bill: ${response.status}`);
+			}
+			const result = await response.json();
+			bill = result.bill;
+			textVersions = result.textVersions;
+			actions = result.actions;
+		} catch (err) {
+			console.error('Error fetching bill:', err);
+			loadError = err.message;
+		} finally {
+			isLoading = false;
+		}
+	}
+
+	// On mount, fetch from API if in Tauri
+	$effect(() => {
+		if (browser && isTauri() && !bill) {
+			const billId = $page.params.id;
+			fetchBillFromAPI(billId);
+		}
+	});
 
 	// State for active tab
 	let activeVersionType = $state(null);
@@ -103,7 +141,7 @@
 				htmlContent = '';
 				
 				// Use our API proxy to fetch the content (avoids CORS issues)
-				fetch(`/api/fetch-bill-text?url=${encodeURIComponent(activeFormat.url)}`)
+				fetch(apiUrl(`/api/fetch-bill-text?url=${encodeURIComponent(activeFormat.url)}`))
 					.then(response => response.json())
 					.then(data => {
 						if (data.error) {
@@ -123,7 +161,7 @@
 			isLoadingHtml = true;
 			htmlContent = '';
 			
-			fetch(`/api/fetch-bill-text?url=${encodeURIComponent(activeFormat.url)}`)
+			fetch(apiUrl(`/api/fetch-bill-text?url=${encodeURIComponent(activeFormat.url)}`))
 				.then(response => response.json())
 				.then(data => {
 					if (data.error) {
@@ -221,6 +259,21 @@
 	}
 </script>
 
+{#if isLoading}
+	<div class="loading-container">
+		<div class="loading-spinner"></div>
+		<p>Loading bill details...</p>
+	</div>
+{:else if error}
+	<div class="error-container">
+		<p class="error-message">{error}</p>
+		<button onclick={() => window.location.reload()}>Retry</button>
+	</div>
+{:else if !bill}
+	<div class="error-container">
+		<p class="error-message">Bill not found</p>
+	</div>
+{:else}
 <div class="page-container" style="--main-width: {mainContentWidth}%"
 	role="presentation"
 	onmousemove={handleMouseMove}
@@ -451,7 +504,7 @@
 					{:else if activeFormat.formatType?.toUpperCase() === 'PDF'}
 						<!-- Embed PDF directly from local server -->
 						<iframe
-							src={`/api/pdf?url=${encodeURIComponent(activeFormat.url)}`}
+							src={apiUrl(`/api/pdf?url=${encodeURIComponent(activeFormat.url)}`)}
 							class="preview-iframe"
 							title="PDF Preview"
 						></iframe>
@@ -537,7 +590,48 @@
 			billText={htmlContent}
 		/>
 	</aside>
-</div><style>
+</div>
+{/if}
+
+<style>
+	.loading-container,
+	.error-container {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		min-height: 50vh;
+		gap: 1rem;
+		color: var(--text-secondary);
+	}
+
+	.loading-spinner {
+		width: 40px;
+		height: 40px;
+		border: 3px solid var(--border-color);
+		border-top-color: var(--accent);
+		border-radius: 50%;
+		animation: spin 1s linear infinite;
+	}
+
+	@keyframes spin {
+		to { transform: rotate(360deg); }
+	}
+
+	.error-message {
+		color: var(--accent);
+		font-size: 1.1rem;
+	}
+
+	.error-container button {
+		padding: 0.5rem 1rem;
+		background: var(--accent);
+		color: white;
+		border: none;
+		border-radius: var(--radius-md);
+		cursor: pointer;
+	}
+
 	.page-container {
 		display: grid;
 		grid-template-columns: calc(var(--main-width, 60%) - 0.5rem) 1rem calc(100% - var(--main-width, 60%) - 1.5rem);
