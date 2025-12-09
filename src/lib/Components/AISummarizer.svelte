@@ -1,5 +1,6 @@
 <script>
 	import { browser } from '$app/environment';
+	import { apiUrl } from '$lib/config.js';
 
 	let { billNumber, billTitle, billText = '' } = $props();
 

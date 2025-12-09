@@ -1,6 +1,8 @@
 <script>
 	import Bill from '$lib/Components/Bill.svelte';
 	import FilterPanel from '$lib/Components/FilterPanel.svelte';
+	import { isTauri, apiUrl } from '$lib/config.js';
+	import { browser } from '$app/environment';
 
 	let { data } = $props();
 
@@ -20,15 +22,43 @@
 	let hasSearched = $state(false);
 	let searchCongress = $state(false);
 	let shouldShowCongressPrompt = $state(false);
+	let isLoading = $state(true);
+	let error = $state(null);
 
-	// Watch for when the promise resolves
+	// Fetch bills client-side when in Tauri (static build)
+	async function fetchBillsFromAPI() {
+		try {
+			const response = await fetch(apiUrl('/api/bills'));
+			if (!response.ok) {
+				throw new Error(`Failed to fetch bills: ${response.status}`);
+			}
+			const bills = await response.json();
+			billsData = bills;
+			isLoading = false;
+		} catch (err) {
+			console.error('Error fetching bills:', err);
+			error = err.message;
+			isLoading = false;
+		}
+	}
+
+	// Watch for when the promise resolves (server-side data)
 	$effect(() => {
-		if (data.bills && data.bills.then) {
+		if (browser && isTauri()) {
+			// In Tauri, fetch from API
+			fetchBillsFromAPI();
+		} else if (data.bills && data.bills.then) {
+			// Server-side: wait for promise
 			data.bills.then(bills => {
 				billsData = bills;
+				isLoading = false;
+			}).catch(err => {
+				error = err.message;
+				isLoading = false;
 			});
 		} else if (data.bills) {
 			billsData = data.bills;
+			isLoading = false;
 		}
 	});
 
@@ -239,18 +269,23 @@
 		<!-- Desktop Header -->
 		<div class="filter-header-desktop">
 			<h3>Recently Updated Bills</h3>
-			<br>http://localhost:5173/
+			<br>
 		</div>
 
-		{#await data.bills}
+		{#if isLoading}
 			<!-- Loading state -->
 			<div class="loading-message">
 				<div class="spinner"></div>
-				<p>Loading bills from Congress.gov...</p>
+				<p>Loading bills...</p>
 			</div>
-		{:then}
-			<!-- Success state -->
-			{#if !billsData || billsData.length === 0}
+		{:else if error}
+		<!-- Error state -->
+		<div class="error-message">
+			<p>Error loading bills: {error}</p>
+		</div>
+	{:else}
+		<!-- Success state -->
+		{#if !billsData || billsData.length === 0}
 				<div class="empty-message">
 					<p>No bills found in the database.</p>
 				</div>
@@ -380,12 +415,7 @@
 					{/if}
 				{/if}
 			{/if}
-		{:catch error}
-			<!-- Error state -->
-			<div class="error-message">
-				<p>Error loading bills: {error.message}</p>
-			</div>
-		{/await}
+		{/if}
 	</section>
 </div>
 

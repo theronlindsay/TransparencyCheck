@@ -1,3 +1,4 @@
+export const ssr = false;
 import { CONGRESS_API_KEY } from '$env/static/private';
 import { initDatabase, execute, query, saveBillActions } from '$lib/db.js';
 

@@ -1,8 +1,58 @@
 <script>
 	import AISummarizer from '$lib/Components/AISummarizer.svelte';
+	import { apiUrl, isTauri } from '$lib/config.js';
+	import { browser } from '$app/environment';
+	import { page } from '$app/stores';
 	
 	let { data } = $props();
-	const { bill, textVersions, actions } = data;
+	
+	// Reactive state for bill data (can be updated client-side in Tauri)
+	let bill = $state(data.bill);
+	let textVersions = $state(data.textVersions);
+	let actions = $state(data.actions);
+	let isLoading = $state(false);
+	let loadError = $state(null);
+
+	// Debug logging
+	$effect(() => {
+		console.log('Bill ID:', bill?.id);
+		console.log('Text Versions received:', textVersions);
+		console.log('Text Versions length:', textVersions?.length);
+		console.log('Bill type:', bill?.number);
+	});
+
+	// Fetch bill data client-side when in Tauri
+	async function fetchBillFromAPI(billId) {
+		isLoading = true;
+		loadError = null;
+		try {
+			const response = await fetch(apiUrl(`/api/bills/${billId}`));
+			if (!response.ok) {
+				throw new Error(`Failed to fetch bill: ${response.status}`);
+			}
+			const result = await response.json();
+			bill = result.bill;
+			textVersions = result.textVersions;
+			actions = result.actions;
+		} catch (err) {
+			console.error('Error fetching bill:', err);
+			loadError = err.message;
+		} finally {
+			isLoading = false;
+		}
+	}
+
+	// On mount, fetch from API if in Tauri
+	$effect(() => {
+		if (browser && isTauri() && !bill) {
+			const billId = $page.params.id;
+			fetchBillFromAPI(billId);
+		}
+	});
+
+	function handleRetry() {
+		window.location.reload();
+	}
 
 	// State for active tab
 	let activeVersionType = $state(null);
@@ -38,13 +88,22 @@
 
 	// Group text versions by type (e.g., "Introduced in House", "Engrossed in House")
 	let versionsByType = $derived.by(() => {
+		console.log('🔍 Computing versionsByType...');
+		console.log('textVersions:', textVersions);
+		console.log('textVersions type:', typeof textVersions);
+		console.log('textVersions length:', textVersions?.length);
+		
 		if (!textVersions || textVersions.length === 0) {
+			console.log('❌ No text versions to group');
 			return {};
 		}
+		
+		console.log('✅ Grouping', textVersions.length, 'text versions');
 		
 		const grouped = {};
 		textVersions.forEach(version => {
 			const type = version.type || 'Unknown';
+			console.log(`  - Version type: "${type}", format: "${version.formatType}"`);
 			
 			if (!grouped[type]) {
 				grouped[type] = {
@@ -59,6 +118,9 @@
 				contentFetched: version.contentFetched
 			});
 		});
+		
+		console.log('📊 Grouped versions:', grouped);
+		console.log('📊 Number of version types:', Object.keys(grouped).length);
 		
 		// Sort formats to put PDF first
 		Object.keys(grouped).forEach(type => {
@@ -76,11 +138,14 @@
 	$effect(() => {
 		if (!activeVersionType && Object.keys(versionsByType).length > 0) {
 			const firstType = Object.keys(versionsByType)[0];
+			console.log('🎯 Setting initial active version type:', firstType);
 			activeVersionType = firstType;
 			
 			// Set first format as active (which is now PDF if available)
 			if (versionsByType[firstType].formats.length > 0) {
-				activeFormat = versionsByType[firstType].formats[0];
+				const initialFormat = versionsByType[firstType].formats[0];
+				console.log('🎯 Setting initial active format:', initialFormat);
+				activeFormat = initialFormat;
 			}
 		}
 	});
@@ -103,7 +168,7 @@
 				htmlContent = '';
 				
 				// Use our API proxy to fetch the content (avoids CORS issues)
-				fetch(`/api/fetch-bill-text?url=${encodeURIComponent(activeFormat.url)}`)
+				fetch(apiUrl(`/api/fetch-bill-text?url=${encodeURIComponent(activeFormat.url)}`))
 					.then(response => response.json())
 					.then(data => {
 						if (data.error) {
@@ -123,7 +188,7 @@
 			isLoadingHtml = true;
 			htmlContent = '';
 			
-			fetch(`/api/fetch-bill-text?url=${encodeURIComponent(activeFormat.url)}`)
+			fetch(apiUrl(`/api/fetch-bill-text?url=${encodeURIComponent(activeFormat.url)}`))
 				.then(response => response.json())
 				.then(data => {
 					if (data.error) {
@@ -145,6 +210,10 @@
 	});
 
 	function selectVersion(type, format) {
+		console.log('📌 Selecting version:');
+		console.log('  Type:', type);
+		console.log('  Format:', format);
+		console.log('  Format URL:', format.url);
 		activeVersionType = type;
 		activeFormat = format;
 	}
@@ -189,16 +258,16 @@
 	}
 
 	function getCongressUrl(billNumber, congress) {
-		// Parse bill number like "H.R.3062", "S.RES.499", "HR3062", "S2392"
-		// First, remove all periods from the bill number
-		const cleanBillNumber = billNumber?.replace(/\./g, '');
-		const match = cleanBillNumber?.match(/^([A-Z]+)(\d+)$/i);
+		// Parse bill number like "H.R.3062", "S.1234", "HR3062", "S.RES.123", "H.J.RES.45"
+		// Remove all dots and spaces first, then match
+		const cleaned = billNumber?.replace(/[\.\s]/g, '').toUpperCase();
+		const match = cleaned?.match(/^([A-Z]+)(\d+)$/i);
 		if (!match || !congress) {
-			console.warn(`Failed to parse bill number: ${billNumber}`);
+			console.warn(`Failed to parse bill number: ${billNumber} (cleaned: ${cleaned})`);
 			return '';
 		}
 		
-		const billType = match[1].toLowerCase(); // "hr", "sres", etc.
+		const billType = match[1].toLowerCase(); // "hr", "s", "hres", "hjres", etc.
 		const billNum = match[2];
 		
 		// Format congress number as "119th-congress"
@@ -223,6 +292,21 @@
 	}
 </script>
 
+{#if isLoading}
+	<div class="loading-container">
+		<div class="loading-spinner"></div>
+		<p>Loading bill details...</p>
+	</div>
+{:else if loadError}
+	<div class="error-container">
+		<p class="error-message">{loadError}</p>
+		<button onclick={handleRetry}>Retry</button>
+	</div>
+{:else if !bill}
+	<div class="error-container">
+		<p class="error-message">Bill not found</p>
+	</div>
+{:else}
 <div class="page-container" style="--main-width: {mainContentWidth}%"
 	role="presentation"
 	onmousemove={handleMouseMove}
@@ -453,7 +537,7 @@
 					{:else if activeFormat.formatType?.toUpperCase() === 'PDF'}
 						<!-- Embed PDF directly from local server -->
 						<iframe
-							src={`/api/pdf?url=${encodeURIComponent(activeFormat.url)}`}
+							src={apiUrl(`/api/pdf?url=${encodeURIComponent(activeFormat.url)}`)}
 							class="preview-iframe"
 							title="PDF Preview"
 						></iframe>
@@ -539,7 +623,48 @@
 			billText={htmlContent}
 		/>
 	</aside>
-</div><style>
+</div>
+{/if}
+
+<style>
+	.loading-container,
+	.error-container {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		min-height: 50vh;
+		gap: 1rem;
+		color: var(--text-secondary);
+	}
+
+	.loading-spinner {
+		width: 40px;
+		height: 40px;
+		border: 3px solid var(--border-color);
+		border-top-color: var(--accent);
+		border-radius: 50%;
+		animation: spin 1s linear infinite;
+	}
+
+	@keyframes spin {
+		to { transform: rotate(360deg); }
+	}
+
+	.error-message {
+		color: var(--accent);
+		font-size: 1.1rem;
+	}
+
+	.error-container button {
+		padding: 0.5rem 1rem;
+		background: var(--accent);
+		color: white;
+		border: none;
+		border-radius: var(--radius-md);
+		cursor: pointer;
+	}
+
 	.page-container {
 		display: grid;
 		grid-template-columns: calc(var(--main-width, 60%) - 0.5rem) 1rem calc(100% - var(--main-width, 60%) - 1.5rem);
@@ -664,6 +789,54 @@
 		color: var(--accent);
 		letter-spacing: 0.05em;
 		text-transform: uppercase;
+	}
+
+	.header-top {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+		margin-bottom: 1rem;
+	}
+
+	.back-button {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.5rem 1rem;
+		background: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: var(--radius-md);
+		color: var(--text-primary);
+		font-size: 0.95rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		text-decoration: none;
+	}
+
+	.back-button:hover {
+		background: var(--bg-primary);
+		border-color: var(--accent);
+		color: var(--accent);
+		transform: translateX(-2px);
+	}
+
+	.back-button svg {
+		transition: transform 0.2s ease;
+	}
+
+	.back-button:hover svg {
+		transform: translateX(-3px);
+	}
+
+	.bill-number {
+		font-size: 1.1rem;
+		font-weight: 600;
+		color: var(--accent);
+		padding: 0.5rem 1rem;
+		background: rgba(241, 58, 55, 0.05);
+		border: 1px solid rgba(241, 58, 55, 0.2);
+		border-radius: var(--radius-md);
 	}
 
 	.bill-title {

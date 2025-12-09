@@ -2,6 +2,16 @@ import { json } from '@sveltejs/kit';
 import { OpenAI } from 'openai'
 import { OPENAI_API_KEY } from '$env/static/private';
 
+const corsHeaders = {
+	'Access-Control-Allow-Origin': '*',
+	'Access-Control-Allow-Methods': 'POST, OPTIONS',
+	'Access-Control-Allow-Headers': 'Content-Type'
+};
+
+export async function OPTIONS() {
+	return new Response(null, { headers: corsHeaders });
+}
+
 let promptText;
 
 // Server-side validation rules
@@ -109,10 +119,10 @@ export async function POST({ request }) {
 		// Call printPrompt function and get the response
 		const response = await printPrompt(prompt, tools);
 
-		return json({ success: true, response, prompt });
+		return json({ success: true, response, prompt }, { headers: corsHeaders });
 	} catch (error) {
 		console.error('Error in openAI endpoint:', error);
-		return json({ error: error.message, success: false }, { status: 500 });
+		return json({ error: error.message, success: false }, { status: 500, headers: corsHeaders });
 	}
 }
 

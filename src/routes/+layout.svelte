@@ -2,10 +2,13 @@
 	import { onMount } from 'svelte';
 	import favicon from '$lib/assets/favicon.svg';
 	import Navbar from '$lib/Components/Navbar.svelte';
+	import { isTauri, getApiBaseUrl } from '$lib/config.js';
 	import '../lib/styles/theme.css';
 
 	let { children } = $props();
 	let isScrolled = $state(false);
+	let debugInfo = $state('');
+	let showDebug = $state(false);
 
 	onMount(() => {
 		const handleScroll = () => {
@@ -13,6 +16,17 @@
 		};
 
 		window.addEventListener('scroll', handleScroll);
+		
+		// Debug info for troubleshooting mobile
+		debugInfo = `
+			isTauri: ${isTauri()}
+			protocol: ${window.location.protocol}
+			hostname: ${window.location.hostname}
+			apiBase: ${getApiBaseUrl()}
+			__TAURI__: ${!!window.__TAURI__}
+			__TAURI_IPC__: ${!!window.__TAURI_IPC__}
+		`;
+		
 		return () => window.removeEventListener('scroll', handleScroll);
 	});
 </script>
@@ -28,6 +42,9 @@
 	<div class="navbar-container" class:scrolled={isScrolled}>
 		<div class="app-header">
 			<a href="/" class="logo-link">
+				<svg width="24" height="24" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" class="back-chevron">
+					<path d="M12.5 15L7.5 10L12.5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+				</svg>
 				<img src="/Logo.png" alt="Transparency Check"/>
 			</a>
 		</div>
@@ -40,9 +57,43 @@
 	<div class="app-content">
 		{@render children?.()}
 	</div>
+	
+	<!-- Debug toggle - tap corner to show -->
+	<button class="debug-toggle" onclick={() => showDebug = !showDebug}>?</button>
+	{#if showDebug}
+		<pre class="debug-panel">{debugInfo}</pre>
+	{/if}
 </div>
 
 <style>
+	.debug-toggle {
+		position: fixed;
+		bottom: 10px;
+		right: 10px;
+		width: 30px;
+		height: 30px;
+		border-radius: 50%;
+		background: rgba(0,0,0,0.5);
+		color: white;
+		border: none;
+		font-size: 14px;
+		z-index: 9999;
+	}
+	
+	.debug-panel {
+		position: fixed;
+		bottom: 50px;
+		right: 10px;
+		background: rgba(0,0,0,0.9);
+		color: #0f0;
+		padding: 10px;
+		font-size: 10px;
+		max-width: 90vw;
+		z-index: 9999;
+		white-space: pre-wrap;
+		border-radius: 8px;
+	}
+
 	.app-layout {
 		min-height: 100vh;
 		display: flex;
@@ -60,13 +111,24 @@
 	.logo-link {
 		display: flex;
 		align-items: center;
+		gap: 0.75rem;
 		text-decoration: none;
 		cursor: pointer;
-		transition: transform 0.2s ease;
+		transition: all 0.2s ease;
 	}
 
 	.logo-link:hover {
-		transform: scale(1.02);
+		transform: translateX(-3px);
+	}
+
+	.back-chevron {
+		color: var(--accent);
+		transition: transform 0.2s ease;
+		flex-shrink: 0;
+	}
+
+	.logo-link:hover .back-chevron {
+		transform: translateX(-3px);
 	}
 
 	.app-header img {
