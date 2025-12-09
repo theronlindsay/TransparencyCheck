@@ -144,7 +144,7 @@
 
 	@media (max-width: 768px) {
 		.page-container {
-			padding: 1rem;
+			padding: 0.5rem;
 		}
 
 		h1 {

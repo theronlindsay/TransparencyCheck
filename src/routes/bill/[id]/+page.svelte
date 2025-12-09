@@ -189,14 +189,16 @@
 	}
 
 	function getCongressUrl(billNumber, congress) {
-		// Parse bill number like "H.R.3062", "S.1234", "HR3062", "S2392"
-		const match = billNumber?.match(/^([A-Z]+)\.?(\d+)$/i);
+		// Parse bill number like "H.R.3062", "S.RES.499", "HR3062", "S2392"
+		// First, remove all periods from the bill number
+		const cleanBillNumber = billNumber?.replace(/\./g, '');
+		const match = cleanBillNumber?.match(/^([A-Z]+)(\d+)$/i);
 		if (!match || !congress) {
 			console.warn(`Failed to parse bill number: ${billNumber}`);
 			return '';
 		}
 		
-		const billType = match[1].toLowerCase(); // "hr" or "s"
+		const billType = match[1].toLowerCase(); // "hr", "sres", etc.
 		const billNum = match[2];
 		
 		// Format congress number as "119th-congress"
@@ -1354,19 +1356,22 @@
 
 	@media (max-width: 768px) {
 		.page-container {
-			padding: 1.5rem;
+			padding: 0.5rem;
 		}
 		.bill-detail-page {
-			padding: 1.5rem;
+			padding: 0.5rem;
 		}
 
 		.bill-title {
 			font-size: 1.8rem;
+			margin: 0 0 1rem 0;
 		}
 
 		.bill-meta {
 			grid-template-columns: 1fr;
-			gap: 1rem;
+			gap: 0.75rem;
+			padding: 0.75rem;
+			margin-bottom: 1rem;
 		}
 
 		.section h2 {
@@ -1398,13 +1403,29 @@
 		}
 
 		.html-content {
-			padding: 1rem;
+			padding: 0.75rem;
 			max-height: 600px;
 		}
 
 		.preview-header {
 			flex-direction: column;
 			align-items: flex-start;
+		}
+
+		.card {
+			padding: 0.75rem;
+		}
+
+		.latest-action {
+			padding: 0.75rem;
+		}
+
+		.main-content {
+			padding: 0.5rem;
+		}
+
+		.sidebar {
+			padding: 0.5rem;
 		}
 	}
 </style>

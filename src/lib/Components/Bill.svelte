@@ -125,7 +125,7 @@
 		background: var(--bg-secondary);
 		border: 1px solid var(--border-color);
 		border-radius: var(--radius-lg);
-		padding: 1.5rem;
+		padding: 1.25rem;
 		transition: all var(--transition-spring);
 		cursor: pointer;
 		overflow: hidden;
@@ -168,7 +168,8 @@
 		font-size: 1.25rem;
 		font-weight: 600;
 		color: var(--text-primary);
-		margin: 0 0 1.25rem 0;
+		margin: 0 0 1.5rem 0;
+		padding: 0 0.25rem;
 		line-height: 1.4;
 		display: -webkit-box;
 		-webkit-box-orient: vertical;
@@ -180,8 +181,8 @@
 	.bill-details {
 		display: flex;
 		flex-direction: column;
-		gap: 0.75rem;
-		margin-bottom: 1.25rem;
+		gap: 1rem;
+		margin-bottom: 1.5rem;
 	}
 
 	.detail-row {
@@ -198,6 +199,7 @@
 		text-transform: uppercase;
 		letter-spacing: 0.08em;
 		flex-shrink: 0;
+		padding: 0.25rem 0;
 	}
 
 	.detail-value {
@@ -208,6 +210,7 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+		padding: 0.25rem 0;
 	}
 
 	/* Latest Action Overlay */
@@ -257,7 +260,7 @@
 	/* Responsive Design */
 	@media (max-width: 768px) {
 		.bill-card {
-			padding: 1.25rem;
+			padding: 1rem;
 		}
 
 		.bill-title {
@@ -275,7 +278,7 @@
 		}
 
 		.latest-action-overlay {
-			padding: 1.5rem;
+			padding: 1rem;
 		}
 
 		.overlay-text {

@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import crypto from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,9 +19,9 @@ async function ensureCacheDir() {
 	}
 }
 
-// Generate a safe filename from URL
+// Generate a safe filename from URL using SHA256 hash
 function generateFileName(url) {
-	const hash = Buffer.from(url).toString('base64').replace(/[^a-z0-9]/gi, '').substring(0, 32);
+	const hash = crypto.createHash('sha256').update(url).digest('hex');
 	return `${hash}.pdf`;
 }
 
@@ -36,6 +37,9 @@ export async function GET({ url }) {
 		
 		const fileName = generateFileName(pdfUrl);
 		const filePath = path.join(PDF_CACHE_DIR, fileName);
+		
+		console.log(`PDF URL: ${pdfUrl}`);
+		console.log(`Cache filename: ${fileName}`);
 		
 		// Check if PDF is already cached
 		let pdfBuffer;

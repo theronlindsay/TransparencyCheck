@@ -13,11 +13,30 @@
 	let aiResponse = $state('');
 	let showPrompt = $state(false);
 	let isLoading = $state(false);
+	
+	// Validation errors from server
+	let serverErrors = $state([]);
 
 	async function generatePrompt() {
 		if (!browser) return; // Only run on client
 
+		// Clear previous server errors
+		serverErrors = [];
+
 		isLoading = true;
+		
+		// Show spinner using classList
+		const spinner = document.querySelector('.btn-primary .spinner');
+		if (spinner) {
+			spinner.classList.add('visible');
+		}
+		
+		// Add loading state to form using classList
+		const form = document.querySelector('.summarizer-form');
+		if (form) {
+			form.classList.add('processing');
+		}
+		
 		let prompt = `Please summarize bill ${billNumber}\n\n`;
 
 		prompt += `Follow these parameters in your summary:\n\n`;
@@ -78,17 +97,31 @@
 
 		// Call API endpoint to send prompt to Node Server
 		try {
+			const requestBody = { prompt };
+			
+			// Add tools array if web search is enabled
+			if (enableWebSearch) {
+				requestBody.tools = [{ type: "web_search" }];
+			}
+			
 			const response = await fetch('/api/openAI', {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
 				},
-				body: JSON.stringify({ prompt })
+				body: JSON.stringify(requestBody)
 			});
 
 			if (!response.ok) {
 				console.error('Failed to send prompt to server:', response.statusText);
-				// Keep showing the prompt if API fails
+				const errorData = await response.json();
+				
+				// Display server validation errors
+				if (errorData.validationErrors) {
+					serverErrors = errorData.validationErrors;
+				} else {
+					serverErrors = [errorData.error || 'Failed to generate summary'];
+				}
 				return;
 			}
 
@@ -97,16 +130,38 @@
 			if (data.success && data.response) {
 				// API call succeeded, show the response
 				aiResponse = data.response;
+				serverErrors = []; // Clear any errors
 			} else {
 				// If API succeeded but no response, keep showing the prompt
 				console.warn('No response from AI');
+				serverErrors = ['No response received from AI'];
 			}
 		} catch (error) {
 			console.error('Error calling API endpoint:', error);
-			// Keep showing the prompt if there's an error
+			serverErrors = ['Network error: ' + error.message];
 		} finally {
 			isLoading = false;
 			showPrompt = true;
+			
+			// Hide spinner using classList
+			const spinner = document.querySelector('.btn-primary .spinner');
+			if (spinner) {
+				spinner.classList.remove('visible');
+			}
+			
+			// Remove loading state from form using classList
+			const form = document.querySelector('.summarizer-form');
+			if (form) {
+				form.classList.remove('processing');
+			}
+			
+			// Add success indicator to prompt display
+			setTimeout(() => {
+				const promptDisplay = document.querySelector('.prompt-display');
+				if (promptDisplay) {
+					promptDisplay.classList.add('visible');
+				}
+			}, 50);
 		}
 	}
 
@@ -119,6 +174,39 @@
 		generatedPrompt = '';
 		aiResponse = '';
 		showPrompt = false;
+		
+		// Remove visible class from prompt display
+		const promptDisplay = document.querySelector('.prompt-display');
+		if (promptDisplay) {
+			promptDisplay.classList.remove('visible');
+		}
+	}
+	
+	// Add interactive highlighting using classList
+	function handleFocus(event) {
+		const formGroup = event.target.closest('.form-group');
+		if (formGroup) {
+			formGroup.classList.add('focused');
+		}
+	}
+	
+	function handleBlur(event) {
+		const formGroup = event.target.closest('.form-group');
+		if (formGroup) {
+			formGroup.classList.remove('focused');
+		}
+	}
+	
+	function handleCheckboxToggle(event) {
+		const checkboxGroup = event.target.closest('.checkbox-group');
+		if (checkboxGroup) {
+			// Toggle active state based on checkbox
+			if (event.target.checked) {
+				checkboxGroup.classList.add('active');
+			} else {
+				checkboxGroup.classList.remove('active');
+			}
+		}
 	}
 </script>
 
@@ -130,8 +218,14 @@
 	<div class="summarizer-form">
 		<!-- Reading Level Selector -->
 		<div class="form-group">
-			<label for="reading-level">Reading Level</label>
-			<select id="reading-level" bind:value={readingLevel} class="select-input">
+			<label for="reading-level" class="text-label">Reading Level</label>
+			<select 
+				id="reading-level" 
+				bind:value={readingLevel} 
+				class="select-input"
+				onfocus={handleFocus}
+				onblur={handleBlur}
+			>
 				<option value="elementary">Elementary School</option>
 				<option value="middle-school">Middle School</option>
 				<option value="high-school">High School</option>
@@ -143,7 +237,11 @@
 		<!-- Web Search Toggle -->
 		<div class="form-group checkbox-group">
 			<label class="checkbox-label">
-				<input type="checkbox" bind:checked={enableWebSearch} />
+				<input 
+					type="checkbox" 
+					bind:checked={enableWebSearch}
+					onchange={handleCheckboxToggle}
+				/>
 				<span class="checkbox-text">
 					<span class="checkbox-title">Enable Web Search</span>
 					<span class="checkbox-description">Include recent news and analysis</span>
@@ -154,7 +252,11 @@
 		<!-- Opinion/Implications Checkbox -->
 		<div class="form-group checkbox-group">
 			<label class="checkbox-label">
-				<input type="checkbox" bind:checked={getOpinion} />
+				<input 
+					type="checkbox" 
+					bind:checked={getOpinion}
+					onchange={handleCheckboxToggle}
+				/>
 				<span class="checkbox-text">
 					<span class="checkbox-title">Analyze Implications</span>
 					<span class="checkbox-description">Get AI's analysis of potential impacts</span>
@@ -164,32 +266,55 @@
 
 		<!-- Specific Question -->
 		<div class="form-group">
-			<label for="specific-question">Ask a Specific Question</label>
+			<label for="specific-question" class="text-label">
+				Ask a Specific Question
+				<span class="char-count">{specificQuestion.length}/500</span>
+			</label>
 			<textarea
 				id="specific-question"
 				bind:value={specificQuestion}
 				placeholder="e.g., How does this bill affect small businesses?"
 				class="textarea-input"
 				rows="3"
+				maxlength="500"
+				onfocus={handleFocus}
+				onblur={handleBlur}
 			></textarea>
 		</div>
 
 		<!-- Focus Topic -->
 		<div class="form-group">
-			<label for="focus-topic">Focus on a Topic(s)</label>
+			<label for="focus-topic" class="text-label">
+				Focus on a Topic(s)
+				<span class="char-count">{focusTopic.length}/200</span>
+			</label>
 			<input
 				id="focus-topic"
 				type="text"
 				bind:value={focusTopic}
 				placeholder="e.g., environmental impact, healthcare, taxation"
 				class="text-input"
+				maxlength="200"
+				onfocus={handleFocus}
+				onblur={handleBlur}
 			/>
 		</div>
 
 		<!-- Action Buttons -->
 		<div class="action-buttons">
+			{#if serverErrors.length > 0}
+				<div class="error-banner">
+					<span class="error-icon">⚠️</span>
+					<div class="error-list">
+						{#each serverErrors as error}
+							<div>{error}</div>
+						{/each}
+					</div>
+				</div>
+			{/if}
 			<button onclick={generatePrompt} disabled={isLoading} class="btn btn-primary">
-				{isLoading ? 'Generating...' : 'Summarize'}
+				<span class="spinner"></span>
+				<span class="button-text">{isLoading ? 'Generating...' : 'Summarize'}</span>
 			</button>
 			{#if showPrompt}
 				<button onclick={resetForm} class="btn btn-secondary">
@@ -271,6 +396,58 @@
 		font-weight: 600;
 		color: var(--text-primary);
 		letter-spacing: 0.02em;
+	}
+	
+	.text-label {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+	}
+	
+	.char-count {
+		font-size: 0.75rem;
+		color: var(--text-secondary);
+		font-weight: 400;
+		margin-left: auto;
+	}
+	
+	.error-banner {
+		width: 100%;
+		padding: 0.75rem 1rem;
+		background: rgba(255, 107, 107, 0.1);
+		border: 1px solid rgba(255, 107, 107, 0.3);
+		border-radius: var(--radius-md);
+		color: #ff6b6b;
+		display: flex;
+		align-items: flex-start;
+		gap: 0.5rem;
+		margin-bottom: 0.75rem;
+		font-size: 0.9rem;
+		animation: slideDown 0.3s ease-out;
+	}
+	
+	.error-list {
+		flex: 1;
+	}
+	
+	.error-list div {
+		margin: 0.25rem 0;
+	}
+	
+	.error-icon {
+		font-size: 1.2rem;
+		flex-shrink: 0;
+	}
+	
+	@keyframes slideDown {
+		from {
+			opacity: 0;
+			transform: translateY(-10px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
 	}
 
 	.select-input {
@@ -443,6 +620,80 @@
 	.btn-primary:disabled:hover {
 		transform: none;
 		box-shadow: none;
+	}
+
+	/* Spinner styles */
+	.spinner {
+		display: none;
+		width: 16px;
+		height: 16px;
+		border: 2px solid rgba(255, 255, 255, 0.3);
+		border-top-color: white;
+		border-radius: 50%;
+		animation: spin 0.8s linear infinite;
+	}
+	
+	.btn-primary :global(.spinner.visible) {
+		display: inline-block;
+	}
+
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	/* Interactive state styles using classList */
+	.form-group :global(.focused) {
+		background: rgba(241, 58, 55, 0.05);
+		border-radius: var(--radius-md);
+		padding: 0.5rem;
+		margin: -0.5rem;
+		transition: all 0.3s ease;
+	}
+
+	.checkbox-group :global(.active) {
+		background: rgba(241, 58, 55, 0.15);
+		border-color: rgba(241, 58, 55, 0.5);
+		box-shadow: 0 0 0 2px rgba(241, 58, 55, 0.1);
+	}
+
+	.summarizer-form :global(.processing) {
+		opacity: 0.7;
+		pointer-events: none;
+		position: relative;
+	}
+
+	.summarizer-form :global(.processing)::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		background: linear-gradient(90deg, transparent, rgba(241, 58, 55, 0.1), transparent);
+		animation: shimmer 2s infinite;
+	}
+
+	@keyframes shimmer {
+		0% {
+			transform: translateX(-100%);
+		}
+		100% {
+			transform: translateX(100%);
+		}
+	}
+
+	.prompt-display :global(.visible) {
+		animation: slideIn 0.3s ease-out;
+	}
+
+	@keyframes slideIn {
+		from {
+			opacity: 0;
+			transform: translateY(-10px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
 	}
 
 	.prompt-display {
