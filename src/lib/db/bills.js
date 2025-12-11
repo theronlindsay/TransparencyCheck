@@ -44,16 +44,31 @@ export async function getBillById(billId) {
 
 	if (!bill) return null;
 
+	// Helper for safe JSON parsing
+	const safeParse = (str, fallback = null) => {
+		if (!str) return fallback;
+		try {
+			return JSON.parse(str);
+		} catch (e) {
+			console.error(`Error parsing JSON for bill ${billId}:`, e);
+			return fallback;
+		}
+	};
+
 	// Parse JSON fields
 	return {
 		...bill,
-		latestAction: bill.latestAction ? JSON.parse(bill.latestAction) : null,
-		policyArea: bill.policyArea ? JSON.parse(bill.policyArea) : null,
+		latestAction: safeParse(bill.latestAction),
+		policyArea: safeParse(bill.policyArea),
 		sponsors: bill.sponsorsData ? 
-			bill.sponsorsData.split('|||').map(s => JSON.parse(s)).filter(s => s.bioguideId) : 
+			bill.sponsorsData.split('|||')
+				.map(s => safeParse(s, {}))
+				.filter(s => s.bioguideId) : 
 			[],
 		committees: bill.committeesData ? 
-			bill.committeesData.split('|||').map(c => JSON.parse(c)).filter(c => c.committeeCode) : 
+			bill.committeesData.split('|||')
+				.map(c => safeParse(c, {}))
+				.filter(c => c.committeeCode) : 
 			[]
 	};
 }

@@ -44,8 +44,10 @@ export async function GET({ params }) {
 
 		return json({ bill, textVersions, actions }, { headers: corsHeaders });
 	} catch (error) {
-		console.error('Error fetching bill:', error);
-		return json({ error: error.message }, { status: 500, headers: corsHeaders });
+		console.error(`Error fetching bill ${params.id}:`, error);
+		// Log the full stack trace
+		if (error.stack) console.error(error.stack);
+		return json({ error: error.message, stack: error.stack }, { status: 500, headers: corsHeaders });
 	}
 }
 

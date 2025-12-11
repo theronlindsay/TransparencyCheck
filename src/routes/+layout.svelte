@@ -6,7 +6,6 @@
 	import Navbar from '$lib/Components/Navbar.svelte';
 	import { isStaticClient, getApiBaseUrl } from '$lib/config.js';
 	import { pwaInfo } from 'virtual:pwa-info';
-	import { App } from '@capacitor/app';
 	import '../lib/styles/theme.css';
 
 	let { children } = $props();
@@ -32,18 +31,28 @@
 
 		window.addEventListener('scroll', handleScroll);
 
-		// Handle Capacitor hardware back button
-		const backButtonListener = await App.addListener('backButton', () => {
-			if ($page.url.pathname !== '/') {
-				window.history.back();
-			} else {
-				App.exitApp();
+		// Handle Capacitor hardware back button (only in Capacitor environment)
+		let backButtonListener = null;
+		if (typeof window !== 'undefined' && window.Capacitor) {
+			try {
+				const { App } = await import('@capacitor/app');
+				backButtonListener = await App.addListener('backButton', () => {
+					if ($page.url.pathname !== '/') {
+						window.history.back();
+					} else {
+						App.exitApp();
+					}
+				});
+			} catch (e) {
+				console.log('Capacitor App plugin not available');
 			}
-		});
+		}
 
 		return () => {
 			window.removeEventListener('scroll', handleScroll);
-			backButtonListener.remove();
+			if (backButtonListener) {
+				backButtonListener.remove();
+			}
 		};
 	});
 

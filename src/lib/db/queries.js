@@ -14,6 +14,9 @@ export async function query(sql, params = []) {
 		db.all(sql, params, (err, rows) => {
 			db.close();
 			if (err) {
+				console.error('Query Error:', err);
+				console.error('SQL:', sql);
+				console.error('Params:', params);
 				reject(err);
 			} else {
 				resolve(rows);
@@ -32,6 +35,9 @@ export async function queryOne(sql, params = []) {
 		db.get(sql, params, (err, row) => {
 			db.close();
 			if (err) {
+				console.error('QueryOne Error:', err);
+				console.error('SQL:', sql);
+				console.error('Params:', params);
 				reject(err);
 			} else {
 				resolve(row);
