@@ -1,6 +1,20 @@
 export const ssr = false;
-import { CONGRESS_API_KEY } from '$env/static/private';
-import { initDatabase, execute, query, saveBillActions } from '$lib/db.js';
+
+// For static builds (Capacitor), return empty data - client will fetch from API
+const isStaticBuild = import.meta.env.VITE_STATIC_BUILD === 'true';
+
+// Only import server-side dependencies if not a static build
+let CONGRESS_API_KEY, initDatabase, execute, query, saveBillActions;
+
+if (!isStaticBuild) {
+	const envModule = await import('$env/static/private');
+	CONGRESS_API_KEY = envModule.CONGRESS_API_KEY;
+	const dbModule = await import('$lib/db.js');
+	initDatabase = dbModule.initDatabase;
+	execute = dbModule.execute;
+	query = dbModule.query;
+	saveBillActions = dbModule.saveBillActions;
+}
 
 // Helper function to determine bill status from API data
 function determineBillStatus(bill) {
@@ -86,6 +100,13 @@ async function getBillActionsFromAPI(actionsUrl) {
 }
 
 export async function load() {
+	// For static builds (Capacitor), return empty data - client will fetch from API
+	if (isStaticBuild) {
+		return {
+			bills: Promise.resolve([])
+		};
+	}
+
 	// Initialize database if it doesn't exist
 	await initDatabase();
 

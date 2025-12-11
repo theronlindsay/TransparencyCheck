@@ -1,8 +1,31 @@
 import { error } from '@sveltejs/kit';
-import { getBillById, getBillTextVersions, getBillActions, execute, query } from '$lib/db.js';
-import { CONGRESS_API_KEY } from '$env/static/private';
+
+// For static builds (Capacitor), return empty data - client will fetch from API
+const isStaticBuild = import.meta.env.VITE_STATIC_BUILD === 'true';
+
+// Only import server-side dependencies if not a static build
+let getBillById, getBillTextVersions, getBillActions, execute, query, CONGRESS_API_KEY;
+
+if (!isStaticBuild) {
+	const dbModule = await import('$lib/db.js');
+	getBillById = dbModule.getBillById;
+	getBillTextVersions = dbModule.getBillTextVersions;
+	getBillActions = dbModule.getBillActions;
+	execute = dbModule.execute;
+	query = dbModule.query;
+	const envModule = await import('$env/static/private');
+	CONGRESS_API_KEY = envModule.CONGRESS_API_KEY;
+}
 
 export async function load({ params }) {
+	// For static builds (Capacitor), return empty data - client will fetch from API
+	if (isStaticBuild) {
+		return {
+			bill: null,
+			billId: params.id
+		};
+	}
+
 	try {
 		const billData = await getBillById(params.id);
 

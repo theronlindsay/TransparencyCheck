@@ -1,7 +1,21 @@
-import { query } from '$lib/db.js';
+// For static builds (Capacitor), return empty data - client will fetch from API
+const isStaticBuild = import.meta.env.VITE_STATIC_BUILD === 'true';
+
+let query;
+if (!isStaticBuild) {
+	const dbModule = await import('$lib/db.js');
+	query = dbModule.query;
+}
 
 // Load all bills with their sponsors and committees for the bills page
 export async function load() {
+	// For static builds (Capacitor), return empty data - client will fetch from API
+	if (isStaticBuild) {
+		return {
+			bills: Promise.resolve([])
+		};
+	}
+
 	// Return a promise that will resolve later, allowing the page to render immediately
 	const billsPromise = fetchBillsWithData();
 
