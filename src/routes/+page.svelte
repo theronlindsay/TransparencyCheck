@@ -14,7 +14,7 @@
 	let dateTo = $state('');
 	let itemsPerPage = $state(25);
 	let currentPage = $state(1);
-	let showFilters = $state(true);
+	let showFilters = $state(false);
 	let isSearching = $state(false);
 	let serverSearchResults = $state([]);
 	let hasSearched = $state(false);
@@ -22,6 +22,45 @@
 	let shouldShowCongressPrompt = $state(false);
 	let isLoading = $state(true);
 	let error = $state(null);
+
+	export const snapshot = {
+		capture: () => ({
+			billsData,
+			searchQuery,
+			statusFilter,
+			chamberFilter,
+			sponsorFilter,
+			dateFrom,
+			dateTo,
+			itemsPerPage,
+			currentPage,
+			showFilters,
+			isSearching,
+			serverSearchResults,
+			hasSearched,
+			searchCongress,
+			isLoading,
+			error
+		}),
+		restore: (value) => {
+			billsData = value.billsData;
+			searchQuery = value.searchQuery;
+			statusFilter = value.statusFilter;
+			chamberFilter = value.chamberFilter;
+			sponsorFilter = value.sponsorFilter;
+			dateFrom = value.dateFrom;
+			dateTo = value.dateTo;
+			itemsPerPage = value.itemsPerPage;
+			currentPage = value.currentPage;
+			showFilters = value.showFilters;
+			isSearching = value.isSearching;
+			serverSearchResults = value.serverSearchResults;
+			hasSearched = value.hasSearched;
+			searchCongress = value.searchCongress;
+			isLoading = value.isLoading;
+			error = value.error;
+		}
+	};
 
 	// Fetch bills client-side
 	async function fetchBillsFromAPI() {
@@ -42,7 +81,8 @@
 
 	// Fetch bills on mount (client-side)
 	$effect(() => {
-		if (browser) {
+		if (browser && billsData.length === 0 && !error) {
+			isLoading = true;
 			fetchBillsFromAPI();
 		}
 	});
@@ -253,7 +293,17 @@
 
 		<!-- Desktop Header -->
 		<div class="filter-header-desktop">
-			<h3>Recently Updated Bills</h3>
+			<div class="header-row">
+				<h3>Recently Updated Bills</h3>
+				<button class="filter-toggle" onclick={toggleFilters} aria-label="Toggle filters">
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<line x1="4" y1="6" x2="20" y2="6"></line>
+						<line x1="4" y1="12" x2="20" y2="12"></line>
+						<line x1="4" y1="18" x2="20" y2="18"></line>
+					</svg>
+					Filters {showFilters ? '▲' : '▼'}
+				</button>
+			</div>
 			<br>
 		</div>
 
@@ -436,6 +486,12 @@
 
 	.filter-header-desktop {
 		display: block;
+	}
+
+	.header-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
 	}
 
 	.filter-header-desktop h3,

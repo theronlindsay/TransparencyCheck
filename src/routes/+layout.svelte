@@ -1,9 +1,12 @@
 <script>
 	import { onMount } from 'svelte';
+	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
 	import favicon from '$lib/assets/favicon.svg';
 	import Navbar from '$lib/Components/Navbar.svelte';
 	import { isStaticClient, getApiBaseUrl } from '$lib/config.js';
 	import { pwaInfo } from 'virtual:pwa-info';
+	import { App } from '@capacitor/app';
 	import '../lib/styles/theme.css';
 
 	let { children } = $props();
@@ -28,8 +31,32 @@
 		};
 
 		window.addEventListener('scroll', handleScroll);
-		return () => window.removeEventListener('scroll', handleScroll);
+
+		// Handle Capacitor hardware back button
+		const backButtonListener = await App.addListener('backButton', () => {
+			if ($page.url.pathname !== '/') {
+				window.history.back();
+			} else {
+				App.exitApp();
+			}
+		});
+
+		return () => {
+			window.removeEventListener('scroll', handleScroll);
+			backButtonListener.remove();
+		};
 	});
+
+	function handleLogoClick(e) {
+		if ($page.url.pathname !== '/') {
+			e.preventDefault();
+			if (window.history.state && window.history.state.idx > 0) {
+				window.history.back();
+			} else {
+				goto('/');
+			}
+		}
+	}
 </script>
 
 <svelte:head>
@@ -43,10 +70,12 @@
 
 	<div class="navbar-container" class:scrolled={isScrolled}>
 		<div class="app-header">
-			<a href="/" class="logo-link">
-				<svg width="24" height="24" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" class="back-chevron">
-					<path d="M12.5 15L7.5 10L12.5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-				</svg>
+			<a href="/" class="logo-link" onclick={handleLogoClick}>
+				{#if $page.url.pathname !== '/'}
+					<svg width="24" height="24" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" class="back-chevron">
+						<path d="M12.5 15L7.5 10L12.5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+					</svg>
+				{/if}
 				<img src="/Logo.png" alt="Transparency Check"/>
 			</a>
 		</div>
@@ -115,7 +144,7 @@
 		flex-direction: row;
 		align-items: center;
 		justify-content: space-between;
-		padding: 0;
+		padding: env(safe-area-inset-top) 0 0 0;
 	}
 
 	.navbar-container .app-header {

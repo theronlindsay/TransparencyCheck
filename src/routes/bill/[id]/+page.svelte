@@ -1,8 +1,10 @@
 <script>
 	import AISummarizer from '$lib/Components/AISummarizer.svelte';
+	import PdfViewer from '$lib/Components/PdfViewer.svelte';
 	import { apiUrl } from '$lib/config.js';
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
+	import { fly } from 'svelte/transition';
 	
 	// Reactive state for bill data (fetched client-side)
 	let bill = $state(null);
@@ -10,6 +12,31 @@
 	let actions = $state([]);
 	let isLoading = $state(true);
 	let loadError = $state(null);
+
+	// Mobile PDF Viewer Logic
+	let showMobilePdf = $state(false);
+	let touchStartY = 0;
+
+	function openMobilePdf() {
+		showMobilePdf = true;
+		if (browser) document.body.style.overflow = 'hidden';
+	}
+
+	function closeMobilePdf() {
+		showMobilePdf = false;
+		if (browser) document.body.style.overflow = '';
+	}
+
+	function handleOverlayTouchStart(e) {
+		touchStartY = e.touches[0].clientY;
+	}
+
+	function handleOverlayTouchEnd(e) {
+		const touchEndY = e.changedTouches[0].clientY;
+		if (touchEndY - touchStartY > 50) { // Swipe down threshold
+			closeMobilePdf();
+		}
+	}
 
 	// Fetch bill data client-side
 	async function fetchBillFromAPI(billId) {
@@ -534,12 +561,18 @@
 							{@html htmlContent}
 						</div>
 					{:else if activeFormat.formatType?.toUpperCase() === 'PDF'}
-						<!-- Embed PDF directly from local server -->
-						<iframe
-							src={apiUrl(`/api/pdf?url=${encodeURIComponent(activeFormat.url)}`)}
-							class="preview-iframe"
-							title="PDF Preview"
-						></iframe>
+						<!-- Desktop View -->
+						<div class="desktop-pdf-view">
+							<PdfViewer url={apiUrl(`/api/pdf?url=${encodeURIComponent(activeFormat.url)}`)} />
+						</div>
+						
+						<!-- Mobile View Trigger -->
+						<div class="mobile-pdf-view">
+							<button class="view-pdf-btn" onclick={openMobilePdf}>
+								<span class="icon">📄</span>
+								View PDF Document
+							</button>
+						</div>
 					{:else if activeFormat.formatType?.toUpperCase().includes('XML')}
 						<!-- Display XML with syntax highlighting -->
 						{#if isLoadingHtml}
@@ -623,6 +656,24 @@
 		/>
 	</aside>
 </div>
+
+{#if showMobilePdf && activeFormat}
+	<div class="pdf-overlay" transition:fly={{ y: 1000, duration: 300 }}>
+		<div class="pdf-handle-area" 
+			 role="button"
+			 tabindex="0"
+			 ontouchstart={handleOverlayTouchStart} 
+			 ontouchend={handleOverlayTouchEnd}
+			 onclick={closeMobilePdf}
+		>
+			<div class="pdf-handle"></div>
+		</div>
+		<div class="pdf-overlay-content">
+			<PdfViewer url={apiUrl(`/api/pdf?url=${encodeURIComponent(activeFormat.url)}`)} />
+		</div>
+	</div>
+{/if}
+
 {/if}
 
 <style>
@@ -1347,13 +1398,6 @@
 		box-shadow: 0 4px 8px rgba(255, 91, 88, 0.3);
 	}
 
-	.preview-iframe {
-		width: 100%;
-		height: 800px;
-		border: none;
-		background: white;
-	}
-
 	.html-content {
 		padding: 2rem;
 		background: white;
@@ -1570,10 +1614,6 @@
 			min-width: 100px;
 		}
 
-		.preview-iframe {
-			height: 600px;
-		}
-
 		.html-content {
 			padding: 0.75rem;
 			max-height: 600px;
@@ -1598,6 +1638,84 @@
 
 		.sidebar {
 			padding: 0.5rem;
+		}
+	}
+
+	/* Mobile PDF Viewer */
+	.desktop-pdf-view {
+		display: block;
+	}
+	.mobile-pdf-view {
+		display: none;
+	}
+
+	.view-pdf-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.75rem;
+		width: 100%;
+		padding: 1rem;
+		background: var(--bg-tertiary);
+		border: 1px solid var(--border-color);
+		border-radius: var(--radius-md);
+		color: var(--text-primary);
+		font-size: 1rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition: all 0.2s;
+	}
+
+	.view-pdf-btn:hover {
+		background: var(--bg-secondary);
+		border-color: var(--accent);
+	}
+
+	.pdf-overlay {
+		position: fixed;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
+		background: var(--bg-primary);
+		z-index: 1000;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.pdf-handle-area {
+		width: 100%;
+		height: 40px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: var(--bg-secondary);
+		border-bottom: 1px solid var(--border-color);
+		cursor: pointer;
+		flex-shrink: 0;
+	}
+
+	.pdf-handle {
+		width: 40px;
+		height: 5px;
+		background: var(--text-secondary);
+		border-radius: 3px;
+		opacity: 0.5;
+	}
+
+	.pdf-overlay-content {
+		flex: 1;
+		overflow: hidden;
+		display: flex;
+		flex-direction: column;
+	}
+
+	@media (max-width: 768px) {
+		.desktop-pdf-view {
+			display: none;
+		}
+		.mobile-pdf-view {
+			display: block;
 		}
 	}
 </style>
