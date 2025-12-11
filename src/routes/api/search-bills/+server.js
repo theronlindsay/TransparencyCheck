@@ -1,6 +1,8 @@
-import { CONGRESS_API_KEY } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 import { json } from '@sveltejs/kit';
 import { execute, query } from '$lib/db.js';
+
+const CONGRESS_API_KEY = env.CONGRESS_API_KEY;
 
 // Helper function to determine bill status from API data
 function determineBillStatus(bill) {
