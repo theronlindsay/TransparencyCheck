@@ -1,20 +1,34 @@
 <script>
 	import Bill from '$lib/Components/Bill.svelte';
-
-	// Get data from the server
-	let { data } = $props();
+	import { browser } from '$app/environment';
+	import { apiUrl } from '$lib/config.js';
 
 	// Store the resolved bills data
 	let billsData = $state([]);
+	let isLoading = $state(true);
+	let error = $state(null);
 
-	// Watch for when the promise resolves
+	// Fetch bills client-side
+	async function fetchBillsFromAPI() {
+		try {
+			const response = await fetch(apiUrl('/api/bills'));
+			if (!response.ok) {
+				throw new Error(`Failed to fetch bills: ${response.status}`);
+			}
+			const bills = await response.json();
+			billsData = bills;
+			isLoading = false;
+		} catch (err) {
+			console.error('Error fetching bills:', err);
+			error = err.message;
+			isLoading = false;
+		}
+	}
+
+	// Fetch bills on mount
 	$effect(() => {
-		if (data.bills && data.bills.then) {
-			data.bills.then(bills => {
-				billsData = bills;
-			});
-		} else if (data.bills) {
-			billsData = data.bills;
+		if (browser) {
+			fetchBillsFromAPI();
 		}
 	});
 

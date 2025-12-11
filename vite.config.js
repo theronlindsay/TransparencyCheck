@@ -9,6 +9,30 @@ export default defineConfig({
 		devtoolsJson(),
 		VitePWA({
 			registerType: 'autoUpdate',
+			workbox: {
+				// Add runtime caching for __data.json
+				runtimeCaching: [
+					{
+						urlPattern: /\/__data\.json/,
+						handler: 'NetworkFirst',
+						options: {
+							cacheName: 'sveltekit-data',
+							networkTimeoutSeconds: 1,
+							plugins: [
+								{
+									// Return empty data if network fails
+									handlerDidError: async () => {
+										return new Response(
+											JSON.stringify({ type: 'data', nodes: [null, null] }),
+											{ headers: { 'Content-Type': 'application/json' } }
+										);
+									}
+								}
+							]
+						}
+					}
+				]
+			},
 			manifest: {
 				name: 'Transparency Check',
 				short_name: 'Transparency',

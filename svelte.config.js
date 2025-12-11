@@ -12,7 +12,10 @@ const config = {
 
   kit: {
     adapter: isStatic
-      ? adapterStatic({ fallback: 'index.html' })
+      ? adapterStatic({ 
+          fallback: 'index.html',
+          strict: false  // Allow missing prerender routes
+        })
       : adapterNode(),
   },
 };

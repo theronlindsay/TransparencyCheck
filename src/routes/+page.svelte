@@ -4,8 +4,6 @@
 	import { isStaticClient, apiUrl } from '$lib/config.js';
 	import { browser } from '$app/environment';
 
-	let { data } = $props();
-
 	// Store the resolved bills data
 	let billsData = $state([]);
 	let searchQuery = $state('');
@@ -25,7 +23,7 @@
 	let isLoading = $state(true);
 	let error = $state(null);
 
-	// Fetch bills client-side when in Static Client (Capacitor)
+	// Fetch bills client-side
 	async function fetchBillsFromAPI() {
 		try {
 			const response = await fetch(apiUrl('/api/bills'));
@@ -42,23 +40,10 @@
 		}
 	}
 
-	// Watch for when the promise resolves (server-side data)
+	// Fetch bills on mount (client-side)
 	$effect(() => {
-		if (browser && isStaticClient()) {
-			// In Static Client, fetch from API
+		if (browser) {
 			fetchBillsFromAPI();
-		} else if (data.bills && data.bills.then) {
-			// Server-side: wait for promise
-			data.bills.then(bills => {
-				billsData = bills;
-				isLoading = false;
-			}).catch(err => {
-				error = err.message;
-				isLoading = false;
-			});
-		} else if (data.bills) {
-			billsData = data.bills;
-			isLoading = false;
 		}
 	});
 

@@ -1,27 +1,17 @@
 <script>
 	import AISummarizer from '$lib/Components/AISummarizer.svelte';
-	import { apiUrl, isStaticClient } from '$lib/config.js';
+	import { apiUrl } from '$lib/config.js';
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
 	
-	let { data } = $props();
-	
-	// Reactive state for bill data (can be updated client-side in Static Client)
-	let bill = $state(data.bill);
-	let textVersions = $state(data.textVersions);
-	let actions = $state(data.actions);
-	let isLoading = $state(false);
+	// Reactive state for bill data (fetched client-side)
+	let bill = $state(null);
+	let textVersions = $state([]);
+	let actions = $state([]);
+	let isLoading = $state(true);
 	let loadError = $state(null);
 
-	// Debug logging
-	$effect(() => {
-		console.log('Bill ID:', bill?.id);
-		console.log('Text Versions received:', textVersions);
-		console.log('Text Versions length:', textVersions?.length);
-		console.log('Bill type:', bill?.number);
-	});
-
-	// Fetch bill data client-side when in Tauri
+	// Fetch bill data client-side
 	async function fetchBillFromAPI(billId) {
 		isLoading = true;
 		loadError = null;
@@ -32,8 +22,8 @@
 			}
 			const result = await response.json();
 			bill = result.bill;
-			textVersions = result.textVersions;
-			actions = result.actions;
+			textVersions = result.textVersions || [];
+			actions = result.actions || [];
 		} catch (err) {
 			console.error('Error fetching bill:', err);
 			loadError = err.message;
@@ -42,11 +32,20 @@
 		}
 	}
 
-	// On mount, fetch from API if in Static Client
+	// On mount, fetch from API
 	$effect(() => {
-		if (browser && isStaticClient() && !bill) {
+		if (browser) {
 			const billId = $page.params.id;
 			fetchBillFromAPI(billId);
+		}
+	});
+
+	// Debug logging
+	$effect(() => {
+		if (bill) {
+			console.log('Bill ID:', bill?.id);
+			console.log('Text Versions received:', textVersions);
+			console.log('Text Versions length:', textVersions?.length);
 		}
 	});
 

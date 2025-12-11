@@ -1,12 +1,22 @@
 import { json } from '@sveltejs/kit';
 import { getBillById, getBillTextVersions, getBillActions } from '$lib/db.js';
 
+const corsHeaders = {
+	'Access-Control-Allow-Origin': '*',
+	'Access-Control-Allow-Methods': 'GET, OPTIONS',
+	'Access-Control-Allow-Headers': 'Content-Type'
+};
+
+export async function OPTIONS() {
+	return new Response(null, { headers: corsHeaders });
+}
+
 export async function GET({ params }) {
 	try {
 		const billData = await getBillById(params.id);
 
 		if (!billData) {
-			return json({ error: 'Bill not found' }, { status: 404 });
+			return json({ error: 'Bill not found' }, { status: 404, headers: corsHeaders });
 		}
 
 		// Get text versions and actions
@@ -32,10 +42,10 @@ export async function GET({ params }) {
 			news: []
 		};
 
-		return json({ bill, textVersions, actions });
+		return json({ bill, textVersions, actions }, { headers: corsHeaders });
 	} catch (error) {
 		console.error('Error fetching bill:', error);
-		return json({ error: error.message }, { status: 500 });
+		return json({ error: error.message }, { status: 500, headers: corsHeaders });
 	}
 }
 
