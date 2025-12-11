@@ -105,7 +105,7 @@
 				requestBody.tools = [{ type: "web_search" }];
 			}
 			
-			const response = await fetch('/api/openAI', {
+			const response = await fetch(apiUrl('/api/openAI'), {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'

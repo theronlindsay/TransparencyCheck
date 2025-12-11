@@ -3,55 +3,38 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import Navbar from '$lib/Components/Navbar.svelte';
 	import { isStaticClient, getApiBaseUrl } from '$lib/config.js';
+	import { pwaInfo } from 'virtual:pwa-info';
 	import '../lib/styles/theme.css';
 
 	let { children } = $props();
 	let isScrolled = $state(false);
-	let debugInfo = $state('Initializing...');
-	let showDebug = $state(true);
 
-	onMount(() => {
-		try {
-			debugInfo += '\nMounted!';
-			const handleScroll = () => {
-				isScrolled = window.scrollY > 1;
-			};
-
-			window.addEventListener('scroll', handleScroll);
-			
-			// Debug info for troubleshooting mobile
-			debugInfo += `
-				isStaticClient: ${isStaticClient()}
-				protocol: ${window.location.protocol}
-				hostname: ${window.location.hostname}
-				apiBase: ${getApiBaseUrl()}
-				Capacitor: ${!!window.Capacitor}
-			`;
-
-			// Test API connection
-			fetch(getApiBaseUrl() + '/api/bills')
-				.then(res => debugInfo += `\nAPI Status: ${res.status}`)
-				.catch(err => debugInfo += `\nAPI Error: ${err.message}`);
-			
-			return () => window.removeEventListener('scroll', handleScroll);
-		} catch (e) {
-			debugInfo += `\nError in onMount: ${e.message}`;
+	onMount(async () => {
+		if (pwaInfo) {
+			const { registerSW } = await import('virtual:pwa-register');
+			registerSW({
+				immediate: true,
+				onRegistered(r) {
+					console.log('SW Registered: ' + r);
+				},
+				onRegisterError(error) {
+					console.log('SW registration error', error);
+				}
+			});
 		}
-	});
 
-	// Global error handler
-	if (typeof window !== 'undefined') {
-		window.addEventListener('error', (event) => {
-			debugInfo += `\nGlobal Error: ${event.message}`;
-		});
-		window.addEventListener('unhandledrejection', (event) => {
-			debugInfo += `\nUnhandled Rejection: ${event.reason}`;
-		});
-	}
+		const handleScroll = () => {
+			isScrolled = window.scrollY > 1;
+		};
+
+		window.addEventListener('scroll', handleScroll);
+		return () => window.removeEventListener('scroll', handleScroll);
+	});
 </script>
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
+	{@html pwaInfo?.webManifest.linkTag}
 </svelte:head>
 
 <div class="app-layout">
@@ -76,43 +59,9 @@
 	<div class="app-content">
 		{@render children?.()}
 	</div>
-	
-	<!-- Debug toggle - tap corner to show -->
-	<button class="debug-toggle" onclick={() => showDebug = !showDebug}>?</button>
-	{#if showDebug}
-		<pre class="debug-panel">{debugInfo}</pre>
-	{/if}
 </div>
 
 <style>
-	.debug-toggle {
-		position: fixed;
-		bottom: 10px;
-		right: 10px;
-		width: 30px;
-		height: 30px;
-		border-radius: 50%;
-		background: rgba(0,0,0,0.5);
-		color: white;
-		border: none;
-		font-size: 14px;
-		z-index: 9999;
-	}
-	
-	.debug-panel {
-		position: fixed;
-		bottom: 50px;
-		right: 10px;
-		background: rgba(0,0,0,0.9);
-		color: #0f0;
-		padding: 10px;
-		font-size: 10px;
-		max-width: 90vw;
-		z-index: 9999;
-		white-space: pre-wrap;
-		border-radius: 8px;
-	}
-
 	.app-layout {
 		min-height: 100vh;
 		display: flex;

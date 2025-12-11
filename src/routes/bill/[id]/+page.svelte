@@ -6,7 +6,7 @@
 	
 	let { data } = $props();
 	
-	// Reactive state for bill data (can be updated client-side in Tauri)
+	// Reactive state for bill data (can be updated client-side in Static Client)
 	let bill = $state(data.bill);
 	let textVersions = $state(data.textVersions);
 	let actions = $state(data.actions);

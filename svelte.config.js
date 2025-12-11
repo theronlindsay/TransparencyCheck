@@ -3,8 +3,8 @@ import adapterStatic from '@sveltejs/adapter-static';
 
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
-// Use static adapter for Tauri/Capacitor builds, node adapter for server deployment
-const isStatic = process.env.TAURI_ENV_PLATFORM !== undefined || process.env.STATIC_BUILD === 'true';
+// Use static adapter for Capacitor builds, node adapter for server deployment
+const isStatic = process.env.STATIC_BUILD === 'true';
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {

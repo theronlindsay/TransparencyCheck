@@ -1,7 +1,7 @@
 /**
  * API Configuration
  * 
- * When running in Tauri (static build), API calls go to the VPS server.
+ * When running in Static Client (Capacitor), API calls go to the VPS server.
  * When running in browser on the VPS, API calls use relative paths.
  */
 
@@ -24,21 +24,6 @@ export function isStaticClient() {
 		return true;
 	}
 
-	// Check for Tauri (Desktop AppImage)
-	if (window.__TAURI__ !== undefined) {
-		return true;
-	}
-
-	// Check for Tauri IPC (v2)
-	if (window.__TAURI_IPC__ !== undefined) {
-		return true;
-	}
-
-	// Check for tauri protocol (Linux AppImage uses tauri://localhost)
-	if (window.location.protocol === 'tauri:' || window.location.hostname === 'tauri.localhost') {
-		return true;
-	}
-	
 	return false;
 }
 

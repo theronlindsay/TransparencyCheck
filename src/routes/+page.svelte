@@ -25,7 +25,7 @@
 	let isLoading = $state(true);
 	let error = $state(null);
 
-	// Fetch bills client-side when in Tauri (static build)
+	// Fetch bills client-side when in Static Client (Capacitor)
 	async function fetchBillsFromAPI() {
 		try {
 			const response = await fetch(apiUrl('/api/bills'));
@@ -181,7 +181,7 @@
 			if (dateTo) params.append('dateTo', dateTo);
 			params.append('stream', 'true');
 
-			const response = await fetch(`/api/search-bills?${params.toString()}`);
+			const response = await fetch(apiUrl(`/api/search-bills?${params.toString()}`));
 			
 			console.log('Response status:', response.status);
 			console.log('Response headers:', response.headers.get('Content-Type'));
