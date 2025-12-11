@@ -1,7 +1,7 @@
 <script>
 	import Bill from '$lib/Components/Bill.svelte';
 	import FilterPanel from '$lib/Components/FilterPanel.svelte';
-	import { isTauri, apiUrl } from '$lib/config.js';
+	import { isStaticClient, apiUrl } from '$lib/config.js';
 	import { browser } from '$app/environment';
 
 	let { data } = $props();
@@ -44,8 +44,8 @@
 
 	// Watch for when the promise resolves (server-side data)
 	$effect(() => {
-		if (browser && isTauri()) {
-			// In Tauri, fetch from API
+		if (browser && isStaticClient()) {
+			// In Static Client, fetch from API
 			fetchBillsFromAPI();
 		} else if (data.bills && data.bills.then) {
 			// Server-side: wait for promise

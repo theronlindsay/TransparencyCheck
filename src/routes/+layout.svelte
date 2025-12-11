@@ -2,33 +2,52 @@
 	import { onMount } from 'svelte';
 	import favicon from '$lib/assets/favicon.svg';
 	import Navbar from '$lib/Components/Navbar.svelte';
-	import { isTauri, getApiBaseUrl } from '$lib/config.js';
+	import { isStaticClient, getApiBaseUrl } from '$lib/config.js';
 	import '../lib/styles/theme.css';
 
 	let { children } = $props();
 	let isScrolled = $state(false);
-	let debugInfo = $state('');
-	let showDebug = $state(false);
+	let debugInfo = $state('Initializing...');
+	let showDebug = $state(true);
 
 	onMount(() => {
-		const handleScroll = () => {
-			isScrolled = window.scrollY > 1;
-		};
+		try {
+			debugInfo += '\nMounted!';
+			const handleScroll = () => {
+				isScrolled = window.scrollY > 1;
+			};
 
-		window.addEventListener('scroll', handleScroll);
-		
-		// Debug info for troubleshooting mobile
-		debugInfo = `
-			isTauri: ${isTauri()}
-			protocol: ${window.location.protocol}
-			hostname: ${window.location.hostname}
-			apiBase: ${getApiBaseUrl()}
-			__TAURI__: ${!!window.__TAURI__}
-			__TAURI_IPC__: ${!!window.__TAURI_IPC__}
-		`;
-		
-		return () => window.removeEventListener('scroll', handleScroll);
+			window.addEventListener('scroll', handleScroll);
+			
+			// Debug info for troubleshooting mobile
+			debugInfo += `
+				isStaticClient: ${isStaticClient()}
+				protocol: ${window.location.protocol}
+				hostname: ${window.location.hostname}
+				apiBase: ${getApiBaseUrl()}
+				Capacitor: ${!!window.Capacitor}
+			`;
+
+			// Test API connection
+			fetch(getApiBaseUrl() + '/api/bills')
+				.then(res => debugInfo += `\nAPI Status: ${res.status}`)
+				.catch(err => debugInfo += `\nAPI Error: ${err.message}`);
+			
+			return () => window.removeEventListener('scroll', handleScroll);
+		} catch (e) {
+			debugInfo += `\nError in onMount: ${e.message}`;
+		}
 	});
+
+	// Global error handler
+	if (typeof window !== 'undefined') {
+		window.addEventListener('error', (event) => {
+			debugInfo += `\nGlobal Error: ${event.message}`;
+		});
+		window.addEventListener('unhandledrejection', (event) => {
+			debugInfo += `\nUnhandled Rejection: ${event.reason}`;
+		});
+	}
 </script>
 
 <svelte:head>

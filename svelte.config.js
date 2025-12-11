@@ -3,18 +3,19 @@ import adapterStatic from '@sveltejs/adapter-static';
 
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
-// Use static adapter for Tauri builds, node adapter for server deployment
-const isTauri = process.env.TAURI_ENV_PLATFORM !== undefined;
+// Use static adapter for Tauri/Capacitor builds, node adapter for server deployment
+const isStatic = process.env.TAURI_ENV_PLATFORM !== undefined || process.env.STATIC_BUILD === 'true';
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
   preprocess: vitePreprocess(),
 
   kit: {
-    adapter: isTauri
+    adapter: isStatic
       ? adapterStatic({ fallback: 'index.html' })
       : adapterNode(),
   },
 };
+
 
 export default config;

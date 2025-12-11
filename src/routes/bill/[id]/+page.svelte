@@ -1,6 +1,6 @@
 <script>
 	import AISummarizer from '$lib/Components/AISummarizer.svelte';
-	import { apiUrl, isTauri } from '$lib/config.js';
+	import { apiUrl, isStaticClient } from '$lib/config.js';
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
 	
@@ -42,9 +42,9 @@
 		}
 	}
 
-	// On mount, fetch from API if in Tauri
+	// On mount, fetch from API if in Static Client
 	$effect(() => {
-		if (browser && isTauri() && !bill) {
+		if (browser && isStaticClient() && !bill) {
 			const billId = $page.params.id;
 			fetchBillFromAPI(billId);
 		}

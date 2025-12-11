@@ -4,12 +4,13 @@
   "version": "0.1.0",
   "identifier": "com.transparencycheck.app",
   "build": {
-    "beforeDevCommand": "TAURI_ENV_PLATFORM=android npm run build && npm run preview",
-    "beforeBuildCommand": "TAURI_ENV_PLATFORM=android npm run build",
+    "beforeDevCommand": "STATIC_BUILD=true VITE_STATIC_BUILD=true npm run build && npm run preview",
+    "beforeBuildCommand": "STATIC_BUILD=true VITE_STATIC_BUILD=true npm run build",
     "devUrl": "http://localhost:4173",
     "frontendDist": "../build"
   },
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
         "title": "Transparency Check",

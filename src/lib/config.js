@@ -9,21 +9,33 @@
 const VPS_API_URL = 'https://transparencycheck.theronlindsay.dev';
 
 /**
- * Check if we're running in a Tauri environment
- * Uses multiple detection methods for reliability
+ * Check if we're running in a Static Client environment (Capacitor/Mobile)
  */
-export function isTauri() {
+export function isStaticClient() {
+	// Check for static build flag (Vite)
+	if (import.meta.env.VITE_STATIC_BUILD === 'true') {
+		return true;
+	}
+
 	if (typeof window === 'undefined') return false;
-	
-	// Check for Tauri API
-	if (window.__TAURI__) return true;
-	
-	// Check for Tauri internals (IPC)
-	if (window.__TAURI_IPC__) return true;
-	
-	// Check for tauri protocol in URL (Android uses this)
-	if (window.location.protocol === 'tauri:' || 
-	    window.location.protocol === 'https:' && window.location.hostname === 'tauri.localhost') {
+
+	// Check for Capacitor
+	if (window.Capacitor !== undefined) {
+		return true;
+	}
+
+	// Check for Tauri (Desktop AppImage)
+	if (window.__TAURI__ !== undefined) {
+		return true;
+	}
+
+	// Check for Tauri IPC (v2)
+	if (window.__TAURI_IPC__ !== undefined) {
+		return true;
+	}
+
+	// Check for tauri protocol (Linux AppImage uses tauri://localhost)
+	if (window.location.protocol === 'tauri:' || window.location.hostname === 'tauri.localhost') {
 		return true;
 	}
 	
@@ -32,10 +44,10 @@ export function isTauri() {
 
 /**
  * Get the base URL for API calls
- * Returns empty string for browser (relative paths), or VPS URL for Tauri
+ * Returns empty string for browser (relative paths), or VPS URL for Static Client
  */
 export function getApiBaseUrl() {
-	if (isTauri()) {
+	if (isStaticClient()) {
 		return VPS_API_URL;
 	}
 	return '';

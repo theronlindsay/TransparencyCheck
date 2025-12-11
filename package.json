@@ -6,16 +6,19 @@
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
+		"build:server": "vite build",
+		"build:static": "STATIC_BUILD=true VITE_STATIC_BUILD=true vite build",
 		"preview": "vite preview",
 		"start": "node build",
 		"prepare": "svelte-kit sync || echo ''",
 		"format": "prettier --write .",
 		"lint": "prettier --check . && eslint .",
 		"tauri": "tauri",
-		"tauri:build": "NO_STRIP=1 npx tauri build --bundles appimage",
+		"tauri:build": "NO_STRIP=true npx tauri build --bundles appimage",
 		"tauri:android": "npx tauri android build"
 	},
 	"devDependencies": {
+		"@capacitor/cli": "^8.0.0",
 		"@eslint/compat": "^1.2.5",
 		"@eslint/js": "^9.22.0",
 		"@sveltejs/adapter-static": "^3.0.10",
@@ -34,6 +37,8 @@
 		"vite-plugin-devtools-json": "^1.0.0"
 	},
 	"dependencies": {
+		"@capacitor/android": "^8.0.0",
+		"@capacitor/core": "^8.0.0",
 		"@sveltejs/adapter-node": "^5.3.3",
 		"openai": "^6.8.1",
 		"sqlite3": "^5.1.7"
