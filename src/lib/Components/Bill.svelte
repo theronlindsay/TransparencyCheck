@@ -70,6 +70,12 @@
 		}
 	}
 
+	function truncateTitle(text, maxLength = 150) {
+		if (!text) return '';
+		if (text.length <= maxLength) return text;
+		return text.slice(0, maxLength) + '...';
+	}
+
 </script>
 
 <div
@@ -92,13 +98,13 @@
 
 	
 
-	<h3 class="bill-title">
+	<h3 class="bill-title" title={title}>
 		<div class="card-header">
 			<span class="bill-number">{number}</span>
 			{#if statusTag}
 				<span class="badge">{statusTag}</span>
 			{/if}
-		</div>{title}
+		</div>{truncateTitle(title)}
 	</h3>
 
 	<div class="bill-details">
