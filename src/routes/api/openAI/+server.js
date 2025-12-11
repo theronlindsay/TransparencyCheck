@@ -1,6 +1,8 @@
 import { json } from '@sveltejs/kit';
 import { OpenAI } from 'openai'
-import { OPENAI_API_KEY } from '$env/static/private';
+import { env } from '$env/dynamic/private';
+
+const OPENAI_API_KEY = env.OPENAI_API_KEY;
 
 const corsHeaders = {
 	'Access-Control-Allow-Origin': '*',
