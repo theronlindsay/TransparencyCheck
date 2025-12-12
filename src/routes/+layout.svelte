@@ -4,6 +4,7 @@
 	import { goto } from '$app/navigation';
 	import favicon from '$lib/assets/favicon.svg';
 	import Navbar from '$lib/Components/Navbar.svelte';
+	import BottomTabBar from '$lib/Components/BottomTabBar.svelte';
 	import { isStaticClient, getApiBaseUrl } from '$lib/config.js';
 	import { pwaInfo } from 'virtual:pwa-info';
 	import '../lib/styles/theme.css';
@@ -48,24 +49,13 @@
 			}
 		}
 
-		return () => {
+			return () => {
 			window.removeEventListener('scroll', handleScroll);
 			if (backButtonListener) {
 				backButtonListener.remove();
 			}
 		};
 	});
-
-	function handleLogoClick(e) {
-		if ($page.url.pathname !== '/') {
-			e.preventDefault();
-			if (window.history.state && window.history.state.idx > 0) {
-				window.history.back();
-			} else {
-				goto('/');
-			}
-		}
-	}
 </script>
 
 <svelte:head>
@@ -79,12 +69,7 @@
 
 	<div class="navbar-container" class:scrolled={isScrolled}>
 		<div class="app-header">
-			<a href="/" class="logo-link" onclick={handleLogoClick}>
-				{#if $page.url.pathname !== '/'}
-					<svg width="24" height="24" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" class="back-chevron">
-						<path d="M12.5 15L7.5 10L12.5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-					</svg>
-				{/if}
+			<a href="/" class="logo-link">
 				<img src="/Logo.png" alt="Transparency Check"/>
 			</a>
 		</div>
@@ -97,6 +82,8 @@
 	<div class="app-content">
 		{@render children?.()}
 	</div>
+
+	<BottomTabBar />
 </div>
 
 <style>
@@ -121,20 +108,6 @@
 		text-decoration: none;
 		cursor: pointer;
 		transition: all 0.2s ease;
-	}
-
-	.logo-link:hover {
-		transform: translateX(-3px);
-	}
-
-	.back-chevron {
-		color: var(--accent);
-		transition: transform 0.2s ease;
-		flex-shrink: 0;
-	}
-
-	.logo-link:hover .back-chevron {
-		transform: translateX(-3px);
 	}
 
 	.app-header img {
@@ -171,6 +144,7 @@
 	.app-content {
 		flex: 1;
 		padding: 0;
+		padding-bottom: 70px; /* Space for bottom tab bar */
 	}
 
 	@media (max-width: 768px) {

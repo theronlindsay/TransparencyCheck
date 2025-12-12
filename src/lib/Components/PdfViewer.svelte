@@ -1,11 +1,11 @@
 <script>
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, tick } from 'svelte';
 	import * as pdfjsLib from 'pdfjs-dist';
 	// Import worker as a URL to ensure it works in production builds
 	import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
 
 	let { url } = $props();
-	let canvas;
+	let canvas = $state(null);
 	let pageNum = $state(1);
 	let pageRendering = $state(false);
 	let pageNumPending = $state(null);
@@ -14,6 +14,7 @@
 	let totalPages = $state(0);
 	let error = $state(null);
 	let loading = $state(true);
+	let initialRenderDone = $state(false);
 
 	// Set worker source
 	onMount(() => {
@@ -22,7 +23,16 @@
 
 	$effect(() => {
 		if (url) {
+			initialRenderDone = false;
 			loadPdf(url);
+		}
+	});
+
+	// Render first page when both canvas and pdfDoc are ready
+	$effect(() => {
+		if (canvas && pdfDoc && !initialRenderDone && !loading) {
+			initialRenderDone = true;
+			renderPage(pageNum);
 		}
 	});
 
@@ -36,8 +46,7 @@
 			pdfDoc = await loadingTask.promise;
 			totalPages = pdfDoc.numPages;
 			
-			// Initial render
-			renderPage(pageNum);
+			// Let the effect handle initial render when canvas is ready
 			loading = false;
 		} catch (err) {
 			console.error('Error loading PDF:', err);
@@ -118,13 +127,13 @@
 	{:else}
 		<div class="controls">
 			<div class="pagination">
-				<button class="btn" onclick={onPrevPage} disabled={pageNum <= 1}>
+				<button class="btn" onclick={onPrevPage} disabled={pageNum <= 1} aria-label="Previous page">
 					<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 						<polyline points="15 18 9 12 15 6"></polyline>
 					</svg>
 				</button>
 				<span>Page {pageNum} of {totalPages}</span>
-				<button class="btn" onclick={onNextPage} disabled={pageNum >= totalPages}>
+				<button class="btn" onclick={onNextPage} disabled={pageNum >= totalPages} aria-label="Next page">
 					<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 						<polyline points="9 18 15 12 9 6"></polyline>
 					</svg>
@@ -154,7 +163,7 @@
 			{#if loading}
 				<div class="loading">Loading PDF...</div>
 			{/if}
-			<canvas bind:this={canvas}></canvas>
+			<canvas bind:this={canvas} style:display={loading ? 'none' : 'block'}></canvas>
 		</div>
 	{/if}
 </div>

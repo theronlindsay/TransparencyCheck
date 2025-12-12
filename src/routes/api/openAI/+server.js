@@ -20,15 +20,6 @@ let promptText;
 function validateRequest(prompt, requestData) {
 	const errors = [];
 
-	// Rule 1: Prompt must exist and be within acceptable length
-	if (!prompt || typeof prompt !== 'string') {
-		errors.push('Prompt is required and must be a string');
-	} else if (prompt.length > 100000) {
-		errors.push('Prompt exceeds maximum length of 100,000 characters');
-	} else if (prompt.length < 10) {
-		errors.push('Prompt must be at least 10 characters');
-	}
-
 	// Rule 2: Validate reading level if present in prompt
 	const readingLevelMatch = prompt.match(/Reading Level: (.+)/);
 	if (readingLevelMatch) {
@@ -92,8 +83,8 @@ function validateRequest(prompt, requestData) {
 
 	// Rule 6: Validate bill text length if present
 	const billTextMatch = prompt.match(/Bill Text:\n(.+)/s);
-	if (billTextMatch && billTextMatch[1].length > 50000) {
-		errors.push('Bill text exceeds maximum length of 50,000 characters');
+	if (billTextMatch && billTextMatch[1].length > 200000) {
+		errors.push('Bill text exceeds maximum length of 200,000 characters');
 	}
 
 	return {

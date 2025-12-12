@@ -4,7 +4,8 @@
 	import { apiUrl } from '$lib/config.js';
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
-	import { fly } from 'svelte/transition';
+	import { fly, slide } from 'svelte/transition';
+	import { showAISummarizer } from '$lib/stores/ui.js';
 	
 	// Reactive state for bill data (fetched client-side)
 	let bill = $state(null);
@@ -84,6 +85,7 @@
 	let activeVersionType = $state(null);
 	let activeFormat = $state(null);
 	let htmlContent = $state('');
+	let aiTextContent = $state(''); // Separate text content for AI summarizer
 	let isLoadingHtml = $state(false);
 	let isDragging = $state(false);
 	let mainContentWidth = $state(60); // Percentage width of main content
@@ -172,6 +174,38 @@
 				const initialFormat = versionsByType[firstType].formats[0];
 				console.log('🎯 Setting initial active format:', initialFormat);
 				activeFormat = initialFormat;
+			}
+		}
+	});
+
+	// Pre-load text content for AI summarizer (find first HTML format)
+	$effect(() => {
+		if (textVersions.length > 0 && !aiTextContent) {
+			// Find the first formatted text/HTML version
+			const htmlVersion = textVersions.find(v => 
+				v.formatType?.toUpperCase() === 'FORMATTED TEXT' || 
+				v.formatType?.toUpperCase()?.includes('HTM')
+			);
+			
+			if (htmlVersion) {
+				// Check if content is already stored in database
+				if (htmlVersion.contentFetched && htmlVersion.content) {
+					console.log('📚 Using stored content for AI summarizer');
+					aiTextContent = htmlVersion.content;
+				} else {
+					// Fetch the content
+					console.log('📚 Fetching content for AI summarizer');
+					fetch(apiUrl(`/api/fetch-bill-text?url=${encodeURIComponent(htmlVersion.url)}`))
+						.then(response => response.json())
+						.then(data => {
+							if (!data.error) {
+								aiTextContent = data.content;
+							}
+						})
+						.catch(err => {
+							console.error('Error loading text for AI:', err);
+						});
+				}
 			}
 		}
 	});
@@ -333,7 +367,9 @@
 		<p class="error-message">Bill not found</p>
 	</div>
 {:else}
-<div class="page-container" style="--main-width: {mainContentWidth}%"
+<div class="page-container" 
+	class:centered={!$showAISummarizer}
+	style="--main-width: {mainContentWidth}%"
 	role="presentation"
 	onmousemove={handleMouseMove}
 	onmouseup={handleMouseUp}
@@ -637,7 +673,8 @@
 	</div>
 </div>
 
-	<!-- Resizable Divider -->
+	<!-- Resizable Divider (only show when sidebar is visible) -->
+	{#if $showAISummarizer}
 	<button
 		class="divider"
 		class:active={isDragging}
@@ -646,15 +683,18 @@
 		title="Drag to resize panels"
 		tabindex="-1"
 	></button>
+	{/if}
 
 	<!-- AI Summarizer Sidebar -->
-	<aside class="sidebar">
+	{#if $showAISummarizer}
+	<aside class="sidebar" transition:slide={{ duration: 300, axis: 'x' }}>
 		<AISummarizer 
 			billNumber={bill.number} 
 			billTitle={bill.title}
-			billText={htmlContent}
+			billText={aiTextContent}
 		/>
 	</aside>
+	{/if}
 </div>
 
 {#if showMobilePdf && activeFormat}
@@ -723,6 +763,12 @@
 		margin: 0 auto;
 		height: calc(100vh - 4rem); /* Full viewport height minus padding */
 		overflow: hidden; /* Prevent container from scrolling */
+		transition: grid-template-columns 0.3s ease;
+	}
+
+	.page-container.centered {
+		grid-template-columns: 1fr;
+		max-width: 900px;
 	}
 
 	.main-content {
