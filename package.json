@@ -9,7 +9,7 @@
 		"build:server": "vite build",
 		"build:static": "cross-env STATIC_BUILD=true VITE_STATIC_BUILD=true vite build",
 		"preview": "vite preview",
-		"start": "node build",
+		"start": "node -r dotenv/config build",
 		"prepare": "svelte-kit sync || echo ''",
 		"format": "prettier --write .",
 		"lint": "prettier --check . && eslint ."
@@ -39,6 +39,7 @@
 		"@capacitor/app": "^8.0.0",
 		"@capacitor/core": "^8.0.0",
 		"@sveltejs/adapter-node": "^5.3.3",
+		"dotenv": "^17.2.3",
 		"openai": "^6.8.1",
 		"pdfjs-dist": "^5.4.449",
 		"sqlite3": "^5.1.7"

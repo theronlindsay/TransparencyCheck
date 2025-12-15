@@ -1,7 +1,7 @@
 <script>
 	import Bill from '$lib/Components/Bill.svelte';
 	import FilterPanel from '$lib/Components/FilterPanel.svelte';
-	import { isStaticClient, apiUrl } from '$lib/config.js';
+	import { apiUrl } from '$lib/config.js';
 	import { browser } from '$app/environment';
 
 	// Store the resolved bills data

@@ -5,7 +5,7 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import Navbar from '$lib/Components/Navbar.svelte';
 	import BottomTabBar from '$lib/Components/BottomTabBar.svelte';
-	import { isStaticClient, getApiBaseUrl } from '$lib/config.js';
+	import { getApiBaseUrl } from '$lib/config.js';
 	import { pwaInfo } from 'virtual:pwa-info';
 	import '../lib/styles/theme.css';
 

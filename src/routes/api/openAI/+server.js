@@ -20,7 +20,7 @@ let promptText;
 function validateRequest(prompt, requestData) {
 	const errors = [];
 
-	// Rule 2: Validate reading level if present in prompt
+	// Rule 1: Validate reading level if present in prompt
 	const readingLevelMatch = prompt.match(/Reading Level: (.+)/);
 	if (readingLevelMatch) {
 		const allowedLevels = [
@@ -38,7 +38,7 @@ function validateRequest(prompt, requestData) {
 		}
 	}
 
-	// Rule 3: Check for malicious content or injection attempts
+	// Rule 2: Check for malicious content or injection attempts
 	const suspiciousPatterns = [
 		/<script/i,
 		/javascript:/i,
@@ -56,7 +56,7 @@ function validateRequest(prompt, requestData) {
 		}
 	}
 
-	// Rule 4: Validate tools array if provided
+	// Rule 3: Validate tools array if provided
 	if (requestData.tools) {
 		if (!Array.isArray(requestData.tools)) {
 			errors.push('Tools must be an array');
@@ -76,12 +76,12 @@ function validateRequest(prompt, requestData) {
 		}
 	}
 
-	// Rule 5: Rate limiting check - prompt shouldn't be exactly the same as last one
+	// Rule 4: Rate limiting check - prompt shouldn't be exactly the same as last one
 	if (promptText && prompt === promptText) {
 		errors.push('Duplicate request detected - please wait before resubmitting');
 	}
 
-	// Rule 6: Validate bill text length if present
+	// Rule 5: Validate bill text length if present
 	const billTextMatch = prompt.match(/Bill Text:\n(.+)/s);
 	if (billTextMatch && billTextMatch[1].length > 200000) {
 		errors.push('Bill text exceeds maximum length of 200,000 characters');
