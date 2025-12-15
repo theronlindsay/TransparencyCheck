@@ -14,8 +14,6 @@ export async function OPTIONS() {
 	return new Response(null, { headers: corsHeaders });
 }
 
-let promptText;
-
 // Server-side validation rules
 function validateRequest(prompt, requestData) {
 	const errors = [];
@@ -66,8 +64,8 @@ function validateRequest(prompt, requestData) {
 					errors.push('Each tool must have a valid type');
 					break;
 				}
-				// Only allow specific tool types
-				const allowedToolTypes = ['web_search', 'code_interpreter'];
+				// Only allow specific tool types (OpenAI Responses API)
+				const allowedToolTypes = ['web_search_preview', 'function'];
 				if (!allowedToolTypes.includes(tool.type)) {
 					errors.push(`Invalid tool type: ${tool.type}`);
 					break;
@@ -76,12 +74,7 @@ function validateRequest(prompt, requestData) {
 		}
 	}
 
-	// Rule 4: Rate limiting check - prompt shouldn't be exactly the same as last one
-	if (promptText && prompt === promptText) {
-		errors.push('Duplicate request detected - please wait before resubmitting');
-	}
-
-	// Rule 5: Validate bill text length if present
+	// Rule 4: Validate bill text length if present
 	const billTextMatch = prompt.match(/Bill Text:\n(.+)/s);
 	if (billTextMatch && billTextMatch[1].length > 200000) {
 		errors.push('Bill text exceeds maximum length of 200,000 characters');
@@ -95,8 +88,8 @@ function validateRequest(prompt, requestData) {
 
 export async function POST({ request }) {
 	try {
-        //wait for the prompt and optional tools
-		const { prompt, tools } = await request.json();
+        //wait for the prompt, optional tools, and optional conversation ID
+		const { prompt, tools, conversationId } = await request.json();
 
 		// Server-side validation
 		const validation = validateRequest(prompt, { tools });
@@ -109,51 +102,58 @@ export async function POST({ request }) {
 			}, { status: 400 });
 		}
 
-		// Call printPrompt function and get the response
-		const response = await printPrompt(prompt, tools);
+		// Call requestAI function and get the response
+		const result = await requestAI(prompt, tools, conversationId);
 
-		return json({ success: true, response, prompt }, { headers: corsHeaders });
+		return json({ 
+			success: true, 
+			response: result.text, 
+			conversationId: result.conversationId,
+			prompt 
+		}, { headers: corsHeaders });
 	} catch (error) {
 		console.error('Error in openAI endpoint:', error);
 		return json({ error: error.message, success: false }, { status: 500, headers: corsHeaders });
 	}
 }
 
-async function printPrompt(prompt, tools) {
-	console.log(prompt);
-	if (tools) {
-		console.log('Tools enabled:', tools);
-	}
-    promptText = prompt;
-    return await requestAI(promptText, tools);
-}
-
-async function requestAI(prompt, tools) {
+async function requestAI(prompt, tools, conversationId = null) {
     const client = new OpenAI({
         apiKey: OPENAI_API_KEY
     });
 
+	console.log('Prompt:', prompt);
+	if (tools) {
+		console.log('Tools enabled:', tools);
+	}
+	if (conversationId) {
+		console.log('Continuing conversation:', conversationId);
+	}
+
 	const requestOptions = {
 		model: 'gpt-4o-mini',
-		messages: [
-			{
-				role: 'user',
-				content: prompt
-			}
-		]
+		input: prompt
 	};
 
-	// Add tools if provided
+	// Add tools if provided (Responses API supports web_search_preview, etc.)
 	if (tools && Array.isArray(tools) && tools.length > 0) {
 		requestOptions.tools = tools;
 	}
 
-	const chatGPTResponse = await client.chat.completions.create(requestOptions);
+	// Continue conversation if conversationId provided
+	if (conversationId) {
+		requestOptions.previous_response_id = conversationId;
+	}
 
-	console.log('OpenAI Response:', chatGPTResponse);
+	const response = await client.responses.create(requestOptions);
+
+	console.log('OpenAI Response:', response);
 	
-	// Extract the text content from the response
-	const responseText = chatGPTResponse.choices?.[0]?.message?.content || '';
-	return responseText;
+	// Extract the text content and conversation ID from the Responses API output
+	const outputText = response.output_text || '';
+	return {
+		text: outputText,
+		conversationId: response.id
+	};
 }
 

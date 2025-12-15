@@ -17,6 +17,12 @@
 	
 	// Validation errors from server
 	let serverErrors = $state([]);
+	
+	// Chat state
+	let conversationId = $state(null);
+	let chatMessages = $state([]);
+	let followUpQuestion = $state('');
+	let isSendingFollowUp = $state(false);
 
 	async function generatePrompt() {
 		if (!browser) return; // Only run on client
@@ -102,7 +108,7 @@
 			
 			// Add tools array if web search is enabled
 			if (enableWebSearch) {
-				requestBody.tools = [{ type: "web_search" }];
+				requestBody.tools = [{ type: "web_search_preview" }];
 			}
 			
 			const response = await fetch(apiUrl('/api/openAI'), {
@@ -131,6 +137,17 @@
 			if (data.success && data.response) {
 				// API call succeeded, show the response
 				aiResponse = data.response;
+				conversationId = data.conversationId; // Save for follow-up questions
+				
+				// Add initial exchange to chat history
+				chatMessages = [{
+					role: 'user',
+					content: 'Summarize this bill with the selected options'
+				}, {
+					role: 'assistant',
+					content: data.response
+				}];
+				
 				serverErrors = []; // Clear any errors
 			} else {
 				// If API succeeded but no response, keep showing the prompt
@@ -175,11 +192,80 @@
 		generatedPrompt = '';
 		aiResponse = '';
 		showPrompt = false;
+		conversationId = null;
+		chatMessages = [];
+		followUpQuestion = '';
 		
 		// Remove visible class from prompt display
 		const promptDisplay = document.querySelector('.prompt-display');
 		if (promptDisplay) {
 			promptDisplay.classList.remove('visible');
+		}
+	}
+	
+	// Send follow-up question in chat
+	async function sendFollowUp() {
+		if (!followUpQuestion.trim() || !conversationId || isSendingFollowUp) return;
+		
+		const question = followUpQuestion.trim();
+		followUpQuestion = '';
+		isSendingFollowUp = true;
+		
+		// Add user message to chat
+		chatMessages = [...chatMessages, { role: 'user', content: question }];
+		
+		try {
+			const requestBody = { 
+				prompt: question,
+				conversationId: conversationId
+			};
+			
+			// Add tools if web search was enabled
+			if (enableWebSearch) {
+				requestBody.tools = [{ type: "web_search_preview" }];
+			}
+			
+			const response = await fetch(apiUrl('/api/openAI'), {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(requestBody)
+			});
+			
+			const data = await response.json();
+			
+			if (data.success && data.response) {
+				// Update conversation ID and add response to chat
+				conversationId = data.conversationId;
+				chatMessages = [...chatMessages, { role: 'assistant', content: data.response }];
+				aiResponse = data.response; // Update main response too
+			} else {
+				chatMessages = [...chatMessages, { 
+					role: 'error', 
+					content: data.error || 'Failed to get response' 
+				}];
+			}
+		} catch (error) {
+			chatMessages = [...chatMessages, { 
+				role: 'error', 
+				content: 'Network error: ' + error.message 
+			}];
+		} finally {
+			isSendingFollowUp = false;
+			
+			// Scroll chat to bottom
+			setTimeout(() => {
+				const chatContainer = document.querySelector('.chat-messages');
+				if (chatContainer) {
+					chatContainer.scrollTop = chatContainer.scrollHeight;
+				}
+			}, 50);
+		}
+	}
+	
+	function handleChatKeydown(event) {
+		if (event.key === 'Enter' && !event.shiftKey) {
+			event.preventDefault();
+			sendFollowUp();
 		}
 	}
 	
@@ -346,6 +432,68 @@
 				<div class="prompt-content">
 					<pre>{aiResponse || generatedPrompt}</pre>
 				</div>
+				
+				<!-- Chat Interface for Follow-up Questions -->
+				{#if conversationId}
+					<div class="chat-section">
+						<div class="chat-header">
+							<h5>💬 Ask Follow-up Questions</h5>
+						</div>
+						
+						<div class="chat-messages">
+							{#each chatMessages.slice(2) as message}
+								<div class="chat-message {message.role}">
+									{#if message.role === 'user'}
+										<div class="message-label">You</div>
+									{:else if message.role === 'assistant'}
+										<div class="message-label">AI</div>
+									{:else}
+										<div class="message-label">Error</div>
+									{/if}
+									<div class="message-content">
+										<pre>{message.content}</pre>
+									</div>
+								</div>
+							{/each}
+							
+							{#if isSendingFollowUp}
+								<div class="chat-message assistant loading">
+									<div class="message-label">AI</div>
+									<div class="message-content">
+										<div class="typing-indicator">
+											<span></span>
+											<span></span>
+											<span></span>
+										</div>
+									</div>
+								</div>
+							{/if}
+						</div>
+						
+						<div class="chat-input-area">
+							<textarea
+								bind:value={followUpQuestion}
+								placeholder="Ask a follow-up question..."
+								class="chat-input"
+								rows="2"
+								maxlength="1000"
+								onkeydown={handleChatKeydown}
+								disabled={isSendingFollowUp}
+							></textarea>
+							<button 
+								onclick={sendFollowUp} 
+								disabled={!followUpQuestion.trim() || isSendingFollowUp}
+								class="btn btn-send"
+								title="Send message"
+							>
+								<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+									<line x1="22" y1="2" x2="11" y2="13"></line>
+									<polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+								</svg>
+							</button>
+						</div>
+					</div>
+				{/if}
 			</div>
 		{/if}
 	</div>
@@ -754,5 +902,183 @@
 
 	.prompt-content::-webkit-scrollbar-thumb:hover {
 		background: var(--accent);
+	}
+
+	/* Chat Section Styles */
+	.chat-section {
+		margin-top: 1rem;
+		border-top: 1px solid var(--border-color);
+		padding-top: 1rem;
+	}
+
+	.chat-header {
+		margin-bottom: 0.75rem;
+	}
+
+	.chat-header h5 {
+		margin: 0;
+		font-size: 0.95rem;
+		color: var(--text-primary);
+		font-weight: 600;
+	}
+
+	.chat-messages {
+		max-height: 300px;
+		overflow-y: auto;
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		padding: 0.5rem 0;
+	}
+
+	.chat-message {
+		padding: 0.75rem;
+		border-radius: var(--radius-md);
+		animation: fadeIn 0.3s ease-out;
+	}
+
+	.chat-message.user {
+		background: rgba(var(--accent-rgb, 241, 58, 55), 0.1);
+		border-left: 3px solid var(--accent);
+	}
+
+	.chat-message.assistant {
+		background: rgba(255, 255, 255, 0.05);
+		border-left: 3px solid var(--text-secondary);
+	}
+
+	.chat-message.error {
+		background: rgba(255, 107, 107, 0.1);
+		border-left: 3px solid #ff6b6b;
+	}
+
+	.message-label {
+		font-size: 0.75rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		margin-bottom: 0.25rem;
+		color: var(--text-secondary);
+	}
+
+	.message-content {
+		font-size: 0.9rem;
+		color: var(--text-primary);
+	}
+
+	.message-content pre {
+		margin: 0;
+		font-family: inherit;
+		font-size: inherit;
+		white-space: pre-wrap;
+		word-wrap: break-word;
+	}
+
+	.typing-indicator {
+		display: flex;
+		gap: 4px;
+		padding: 0.5rem 0;
+	}
+
+	.typing-indicator span {
+		width: 8px;
+		height: 8px;
+		background: var(--text-secondary);
+		border-radius: 50%;
+		animation: bounce 1.4s infinite ease-in-out both;
+	}
+
+	.typing-indicator span:nth-child(1) {
+		animation-delay: -0.32s;
+	}
+
+	.typing-indicator span:nth-child(2) {
+		animation-delay: -0.16s;
+	}
+
+	@keyframes bounce {
+		0%, 80%, 100% {
+			transform: scale(0);
+		}
+		40% {
+			transform: scale(1);
+		}
+	}
+
+	@keyframes fadeIn {
+		from {
+			opacity: 0;
+			transform: translateY(10px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+
+	.chat-input-area {
+		display: flex;
+		gap: 0.5rem;
+		margin-top: 0.75rem;
+		align-items: flex-end;
+	}
+
+	.chat-input {
+		flex: 1;
+		padding: 0.75rem;
+		background: var(--bg-primary);
+		border: 1px solid var(--border-color);
+		border-radius: var(--radius-md);
+		color: var(--text-primary);
+		font-size: 0.9rem;
+		resize: none;
+		transition: border-color 0.2s;
+	}
+
+	.chat-input:focus {
+		outline: none;
+		border-color: var(--accent);
+	}
+
+	.chat-input:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+
+	.btn-send {
+		padding: 0.75rem;
+		background: var(--accent);
+		color: white;
+		border: none;
+		border-radius: var(--radius-md);
+		cursor: pointer;
+		transition: all 0.2s;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.btn-send:hover:not(:disabled) {
+		transform: translateY(-2px);
+		box-shadow: 0 4px 12px rgba(241, 58, 55, 0.3);
+	}
+
+	.btn-send:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.chat-messages::-webkit-scrollbar {
+		width: 8px;
+	}
+
+	.chat-messages::-webkit-scrollbar-track {
+		background: rgba(0, 0, 0, 0.1);
+		border-radius: 4px;
+	}
+
+	.chat-messages::-webkit-scrollbar-thumb {
+		background: var(--border-color);
+		border-radius: 4px;
 	}
 </style>
