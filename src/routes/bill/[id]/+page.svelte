@@ -1,4 +1,5 @@
 <script>
+	import { onMount } from 'svelte';
 	import AISummarizer from '$lib/Components/AISummarizer.svelte';
 	import PdfViewer from '$lib/Components/PdfViewer.svelte';
 	import { apiUrl } from '$lib/config.js';
@@ -38,6 +39,27 @@
 			closeMobilePdf();
 		}
 	}
+
+	// Handle back button for mobile PDF viewer
+	$effect(() => {
+		if (browser && showMobilePdf) {
+			const handlePopState = (event) => {
+				event.preventDefault();
+				closeMobilePdf();
+				// Prevent the default back navigation
+				window.history.pushState(null, '', window.location.href);
+			};
+
+			window.addEventListener('popstate', handlePopState);
+			
+			// Push a new state to enable back button interception
+			window.history.pushState(null, '', window.location.href);
+
+			return () => {
+				window.removeEventListener('popstate', handlePopState);
+			};
+		}
+	});
 
 	// Fetch bill data client-side
 	async function fetchBillFromAPI(billId) {
@@ -699,18 +721,28 @@
 
 {#if showMobilePdf && activeFormat}
 	<div class="pdf-overlay" transition:fly={{ y: 1000, duration: 300 }}>
-		<div class="pdf-handle-area" 
-			 role="button"
-			 tabindex="0"
-			 ontouchstart={handleOverlayTouchStart} 
-			 ontouchend={handleOverlayTouchEnd}
-			 onclick={closeMobilePdf}
-		>
-			<div class="pdf-handle"></div>
+		<div class="pdf-header">
+			<div class="pdf-handle-area" 
+				 role="button"
+				 tabindex="0"
+				 ontouchstart={handleOverlayTouchStart} 
+				 ontouchend={handleOverlayTouchEnd}
+				 onclick={closeMobilePdf}
+				 onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); closeMobilePdf(); } }}
+				 onkeyup={(e) => { if (e.key === 'Enter' || e.key === ' ') { closeMobilePdf(); } }}
+			>
+				<div class="pdf-handle"></div>
+			</div>
 		</div>
 		<div class="pdf-overlay-content">
 			<PdfViewer url={apiUrl(`/api/pdf?url=${encodeURIComponent(activeFormat.url)}`)} />
 		</div>
+		<button class="pdf-back-button" onclick={closeMobilePdf} aria-label="Close PDF viewer">
+			<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<polyline points="15 18 9 12 15 6"></polyline>
+			</svg>
+			Back
+		</button>
 	</div>
 {/if}
 
@@ -1727,6 +1759,57 @@
 		z-index: 1000;
 		display: flex;
 		flex-direction: column;
+	}
+
+	.pdf-header {
+		display: flex;
+		flex-direction: column;
+		flex-shrink: 0;
+	}
+
+	.pdf-back-button {
+		position: absolute;
+		bottom: 2rem;
+		right: 2rem;
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.75rem 1.25rem;
+		background: var(--bg-secondary);
+		border: 2px solid var(--border-color);
+		border-radius: var(--radius-lg);
+		color: var(--text-primary);
+		font-size: 1rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		z-index: 1001;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+	}
+
+	.pdf-back-button:hover {
+		background: var(--accent);
+		border-color: var(--accent);
+		color: white;
+		transform: translateY(-2px);
+		box-shadow: 0 6px 16px rgba(241, 58, 55, 0.4);
+	}
+
+	.pdf-back-button svg {
+		transition: transform 0.2s ease;
+	}
+
+	.pdf-back-button:hover svg {
+		transform: translateX(-2px);
+	}
+
+	@media (max-width: 480px) {
+		.pdf-back-button {
+			bottom: 1rem;
+			right: 1rem;
+			padding: 0.6rem 1rem;
+			font-size: 0.9rem;
+		}
 	}
 
 	.pdf-handle-area {
