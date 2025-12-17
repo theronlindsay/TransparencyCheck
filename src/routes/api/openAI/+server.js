@@ -80,6 +80,18 @@ function validateRequest(prompt, requestData) {
 		errors.push('Bill text exceeds maximum length of 200,000 characters');
 	}
 
+	// Rule 5: Validate summary length if present in prompt
+	const summaryLengthMatch = prompt.match(/Summary Length: (\d+)-(\d+)/);
+	if (summaryLengthMatch) {
+		const minLength = parseInt(summaryLengthMatch[1], 10);
+		const maxLength = parseInt(summaryLengthMatch[2], 10);
+
+		if (isNaN(minLength) || isNaN(maxLength) || minLength < 50 || maxLength > 500 || minLength >= maxLength) {
+			errors.push('Invalid summary length range. Must be between 50-500 characters, with min < max.');
+		}
+	}
+
+
 	return {
 		isValid: errors.length === 0,
 		errors

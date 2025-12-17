@@ -1,10 +1,9 @@
-import { env } from '$env/dynamic/private';
 import { json } from '@sveltejs/kit';
-import { execute, query } from '$lib/db.js';
-
-const CONGRESS_API_KEY = env.CONGRESS_API_KEY;
+import { fetchAndStoreBills } from '$lib/bill-fetcher.js';
+import { initDatabase } from '$lib/db.js';
 
 // Helper function to determine bill status from API data
+// This is kept here for formatting the response, as the fetcher module only stores raw data.
 function determineBillStatus(bill) {
 	const latestActionText = bill.latestAction?.text?.toLowerCase() || '';
 	
@@ -48,131 +47,6 @@ function determineBillStatus(bill) {
 	return 'Active';
 }
 
-// Fetch detailed bill information
-async function getBillDetails(billUrl) {
-	const url = `${billUrl}?format=json&api_key=${CONGRESS_API_KEY}`;
-	const response = await fetch(url);
-	const data = await response.json();
-	return data.bill;
-}
-
-// Save bill to database
-async function saveBillToDatabase(bill) {
-	const billId = `${bill.type}${bill.number}`;
-	
-	// Check if bill already exists
-	const existingBill = await query(
-		`SELECT id FROM bills WHERE id = ?`,
-		[billId]
-	);
-	
-	// If bill exists, skip (it's already in the database)
-	if (existingBill.length > 0) {
-		return billId;
-	}
-
-	// Fetch detailed information
-	let detailedBill = bill;
-	if (bill.url) {
-		try {
-			detailedBill = await getBillDetails(bill.url);
-		} catch (error) {
-			console.error(`Error fetching details for ${bill.number}:`, error);
-		}
-	}
-
-	const billStatus = determineBillStatus(detailedBill);
-	
-	// Insert bill into database
-	await execute(
-		`INSERT OR REPLACE INTO bills 
-		(id, billNumber, congress, type, introducedDate, latestAction, status, originChamber, originChamberCode, 
-		title, updateDate, updateDateIncludingText, url, legislationUrl, policyArea, primaryCommitteeCode,
-		actionsCount, actionsUrl, committeesCount, committeesUrl, cosponsorsCount, cosponsorsUrl, 
-		relatedBillsCount, relatedBillsUrl, sponsors, subjectsCount, subjectsUrl, 
-		summariesCount, summariesUrl, textVersionsCount, textVersionsUrl, titlesCount, titlesUrl) 
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		[
-			billId,
-			detailedBill.number,
-			detailedBill.congress,
-			detailedBill.type || null,
-			detailedBill.introducedDate || null,
-			JSON.stringify(detailedBill.latestAction) || null,
-			billStatus,
-			detailedBill.originChamber || null,
-			detailedBill.originChamberCode || null,
-			detailedBill.title || null,
-			detailedBill.updateDate || null,
-			detailedBill.updateDateIncludingText || null,
-			detailedBill.url || null,
-			detailedBill.legislationUrl || null,
-			detailedBill.policyArea ? JSON.stringify(detailedBill.policyArea) : null,
-			null,
-			detailedBill.actions?.count || null,
-			detailedBill.actions?.url || null,
-			detailedBill.committees?.count || null,
-			detailedBill.committees?.url || null,
-			detailedBill.cosponsors?.count || null,
-			detailedBill.cosponsors?.url || null,
-			detailedBill.relatedBills?.count || null,
-			detailedBill.relatedBills?.url || null,
-			detailedBill.sponsors ? JSON.stringify(detailedBill.sponsors) : null,
-			detailedBill.subjects?.count || null,
-			detailedBill.subjects?.url || null,
-			detailedBill.summaries?.count || null,
-			detailedBill.summaries?.url || null,
-			detailedBill.textVersions?.count || null,
-			detailedBill.textVersions?.url || null,
-			detailedBill.titles?.count || null,
-			detailedBill.titles?.url || null
-		]
-	);
-
-	// Process sponsors
-	if (detailedBill.sponsors && Array.isArray(detailedBill.sponsors)) {
-		for (const sponsor of detailedBill.sponsors) {
-			if (sponsor.bioguideId) {
-				try {
-					await execute(
-						`INSERT OR REPLACE INTO people 
-						(bioguideId, firstName, lastName, fullName, branch, party, state, district, donors, url) 
-						VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-						[
-							sponsor.bioguideId,
-							sponsor.firstName || null,
-							sponsor.lastName || null,
-							sponsor.fullName || null,
-							'legislative',
-							sponsor.party || null,
-							sponsor.state || null,
-							sponsor.district || null,
-							null,
-							sponsor.url || null
-						]
-					);
-
-					await execute(
-						`INSERT OR REPLACE INTO bill_people 
-						(billId, personId, relationship, isByRequest) 
-						VALUES (?, ?, ?, ?)`,
-						[
-							billId,
-							sponsor.bioguideId,
-							'sponsor',
-							sponsor.isByRequest || null
-						]
-					);
-				} catch (error) {
-					console.error(`Error saving sponsor ${sponsor.bioguideId}:`, error);
-				}
-			}
-		}
-	}
-
-	return billId;
-}
-
 export async function GET({ url }) {
 	const searchQuery = url.searchParams.get('search') || '';
 	const status = url.searchParams.get('status');
@@ -183,36 +57,10 @@ export async function GET({ url }) {
 	const stream = url.searchParams.get('stream') === 'true';
 
 	try {
-		// Build Congress.gov API query
-		const apiParams = new URLSearchParams({
-			api_key: CONGRESS_API_KEY,
-			format: 'json',
-			limit: '100'
-		});
+		await initDatabase();
 
-		// Add search query if provided
-		if (searchQuery) {
-			apiParams.append('query', searchQuery);
-		}
-
-		// Add date range filters
-		if (dateFrom) {
-			apiParams.append('fromDateTime', `${dateFrom}T00:00:00Z`);
-		}
-		if (dateTo) {
-			apiParams.append('toDateTime', `${dateTo}T23:59:59Z`);
-		}
-
-		const response = await fetch(
-			`https://api.congress.gov/v3/bill?${apiParams.toString()}`
-		);
-
-		if (!response.ok) {
-			throw new Error(`Congress.gov API error: ${response.status}`);
-		}
-
-		const data = await response.json();
-		let bills = data.bills || [];
+        // Fetch bills from Congress.gov and ensure they are stored in the DB
+		const bills = await fetchAndStoreBills({ searchQuery, dateFrom, dateTo });
 
 		// If streaming is requested, return a streaming response
 		if (stream) {
@@ -225,33 +73,7 @@ export async function GET({ url }) {
 					
 					for (const bill of bills) {
 						try {
-							console.log(`Processing bill ${bill.type}${bill.number}...`);
-							
-							// Save to database
-							await saveBillToDatabase(bill);
-							
-							// Format bill
-							const latestActionText = bill.latestAction?.text?.toLowerCase() || '';
-							let billStatus = 'Introduced';
-
-							if (latestActionText.includes('became public law') || 
-								latestActionText.includes('became private law') ||
-								latestActionText.includes('signed by president')) {
-								billStatus = 'Enacted';
-							} else if (latestActionText.includes('vetoed')) {
-								billStatus = 'Vetoed';
-							} else if (latestActionText.includes('failed') || latestActionText.includes('rejected')) {
-								billStatus = 'Failed';
-							} else if (latestActionText.includes('passed senate') || 
-									   latestActionText.includes('received in the senate')) {
-								billStatus = 'Passed House';
-							} else if (latestActionText.includes('passed house') || 
-									   latestActionText.includes('received in the house')) {
-								billStatus = 'Passed Senate';
-							} else if (latestActionText.includes('referred to') || 
-									   latestActionText.includes('committee on')) {
-								billStatus = 'In Committee';
-							}
+							const billStatus = determineBillStatus(bill);
 
 							const formattedBill = {
 								id: `${bill.type}${bill.number}`,
@@ -290,7 +112,6 @@ export async function GET({ url }) {
 
 							if (shouldInclude) {
 								count++;
-								// Send the bill as a JSON line
 								const chunk = JSON.stringify(formattedBill) + '\n';
 								controller.enqueue(encoder.encode(chunk));
 								console.log(`Streamed bill ${count}: ${formattedBill.billNumber}`);
@@ -314,60 +135,28 @@ export async function GET({ url }) {
 			});
 		}
 
-		// Non-streaming response (original behavior)
-		// Save bills to database and get formatted results
-		const formattedBills = [];
-		
-		for (const bill of bills) {
-			try {
-				// Save to database (this will fetch details if needed)
-				await saveBillToDatabase(bill);
-				
-				// Format for response
-				const latestActionText = bill.latestAction?.text?.toLowerCase() || '';
-				let billStatus = 'Introduced';
+		// Non-streaming response
+		const formattedBills = bills.map(bill => {
+            const billStatus = determineBillStatus(bill);
+            return {
+                id: `${bill.type}${bill.number}`,
+                billNumber: `${bill.type}.${bill.number}`,
+                congress: bill.congress,
+                type: bill.type,
+                introducedDate: bill.introducedDate,
+                latestAction: bill.latestAction?.text || '',
+                status: billStatus,
+                originChamber: bill.originChamber,
+                originChamberCode: bill.originChamberCode,
+                title: bill.title,
+                updateDate: bill.updateDate,
+                url: bill.url,
+                policyArea: bill.policyArea?.name || '',
+                sponsors: bill.sponsors?.map(s => s.fullName).join(', ') || ''
+            };
+        });
 
-				if (latestActionText.includes('became public law') || 
-					latestActionText.includes('became private law') ||
-					latestActionText.includes('signed by president')) {
-					billStatus = 'Enacted';
-				} else if (latestActionText.includes('vetoed')) {
-					billStatus = 'Vetoed';
-				} else if (latestActionText.includes('failed') || latestActionText.includes('rejected')) {
-					billStatus = 'Failed';
-				} else if (latestActionText.includes('passed senate') || 
-						   latestActionText.includes('received in the senate')) {
-					billStatus = 'Passed House';
-				} else if (latestActionText.includes('passed house') || 
-						   latestActionText.includes('received in the house')) {
-					billStatus = 'Passed Senate';
-				} else if (latestActionText.includes('referred to') || 
-						   latestActionText.includes('committee on')) {
-					billStatus = 'In Committee';
-				}
-
-				formattedBills.push({
-					id: `${bill.type}${bill.number}`,
-					billNumber: `${bill.type}.${bill.number}`,
-					congress: bill.congress,
-					type: bill.type,
-					introducedDate: bill.introducedDate,
-					latestAction: bill.latestAction?.text || '',
-					status: billStatus,
-					originChamber: bill.originChamber,
-					originChamberCode: bill.originChamberCode,
-					title: bill.title,
-					updateDate: bill.updateDate,
-					url: bill.url,
-					policyArea: bill.policyArea?.name || '',
-					sponsors: bill.sponsors?.map(s => s.fullName).join(', ') || ''
-				});
-			} catch (error) {
-				console.error(`Error processing bill ${bill.type}${bill.number}:`, error);
-			}
-		}
-
-		// Apply client-side filters that Congress.gov API doesn't support directly
+		// Apply filters
 		let filteredBills = formattedBills;
 		
 		if (chamber && chamber !== 'all') {
@@ -382,7 +171,6 @@ export async function GET({ url }) {
 			});
 		}
 
-		// Apply status filter
 		if (status && status !== 'all') {
 			filteredBills = filteredBills.filter(bill => bill.status === status);
 		}

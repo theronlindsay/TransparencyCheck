@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { getBillById, getBillTextVersions, getBillActions } from '$lib/db.js';
+import { getBillById, getBillTextVersions, getBillActions, initDatabase } from '$lib/db.js';
 
 const corsHeaders = {
 	'Access-Control-Allow-Origin': '*',
@@ -13,6 +13,8 @@ export async function OPTIONS() {
 
 export async function GET({ params }) {
 	try {
+		await initDatabase();
+
 		const billData = await getBillById(params.id);
 
 		if (!billData) {

@@ -9,7 +9,7 @@
 	let enableWebSearch = $state(false);
 	let getOpinion = $state(false);
 	let specificQuestion = $state('');
-	let focusTopic = $state('');
+	let outputLength = $state(100);
 	let generatedPrompt = $state('');
 	let aiResponse = $state('');
 	let showPrompt = $state(false);
@@ -77,9 +77,9 @@
 			prompt += `Make sure to answer the following question: ${specificQuestion.trim()}\n\n`;
 		}
 
-		// Add focus topic
-		if (focusTopic.trim()) {
-			prompt += `Focus: Please focus specifically on aspects related to: ${focusTopic.trim()}\n\n`;
+		// Add character limit
+		if (outputLength) {
+			prompt += `Please keep the summary under ${outputLength} words\n\n`;
 		}
 
 		prompt += `Please provide a comprehensive yet concise summary that addresses all the points above. `;
@@ -194,7 +194,7 @@
 		showPrompt = false;
 		conversationId = null;
 		chatMessages = [];
-		followUpQuestion = '';
+		outputLength = 100;
 		
 		// Remove visible class from prompt display
 		const promptDisplay = document.querySelector('.prompt-display');
@@ -370,7 +370,7 @@
 		</div>
 
 		<!-- Focus Topic -->
-		<div class="form-group">
+		<!-- <div class="form-group">
 			<label for="focus-topic" class="text-label">
 				Focus on a Topic(s)
 				<span class="char-count">{focusTopic.length}/200</span>
@@ -385,6 +385,34 @@
 				onfocus={handleFocus}
 				onblur={handleBlur}
 			/>
+		</div> -->
+
+		<div class="form-group">
+			<label for="output-length" class="text-label">
+				Summary Length (words)
+				<span class="char-count">{outputLength}</span>
+			</label>
+			<input
+				id="output-length"
+				type="range"
+				min="50"
+				max="600"
+				step="50"
+				bind:value={outputLength}
+				class="range-input"
+				onfocus={handleFocus}
+				onblur={handleBlur}
+			/>
+			<input
+				type="number"
+				min="50"
+				max="600"
+				bind:value={outputLength}
+				class="text-input output-length-input"
+				onfocus={handleFocus}
+				onblur={handleBlur}
+			/>
+
 		</div>
 
 		<!-- Action Buttons -->

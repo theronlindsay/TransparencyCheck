@@ -4,6 +4,7 @@
 
 import { query, queryOne } from './queries.js';
 import { getDatabase } from './connection.js';
+import { fetchAndStoreBills } from '../bill-fetcher.js';
 
 /**
  * Get a bill by ID with its sponsors and committees
@@ -197,4 +198,30 @@ export async function saveBillActions(billId, actions) {
 			});
 		});
 	});
+}
+
+/**
+ * Get the most recently updated bills (limit 20)
+ */
+export async function getRecentBills(limit = 20) {
+  return await query(
+    `SELECT * FROM bills ORDER BY updateDateIncludingText DESC LIMIT ?`,
+    [limit]
+  );
+}
+
+/**
+ * Sync bills from Congress.gov API and fetch recent bills
+ */
+export async function syncAndFetchBills() {
+  try {
+    // Fetch recent bills from Congress.gov (limit to 20 for background sync)
+    await fetchAndStoreBills({ limit: 20 });
+    // Return the most recently updated bills from database
+    return await getRecentBills(20);
+  } catch (error) {
+    console.error('Error syncing bills:', error);
+    // If sync fails, still try to return existing bills
+    return await getRecentBills(20);
+  }
 }
