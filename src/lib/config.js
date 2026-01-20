@@ -6,7 +6,7 @@
  */
 
 // Set this to your DigitalOcean VPS URL
-const VPS_API_URL = 'https://transparencycheck.theronlindsay.dev';
+const VPS_API_URL = 'https://transparencycheck.app';
 /**
  * Get the base URL for API calls
  * Returns empty string for browser (relative paths), or VPS URL for Static Client
