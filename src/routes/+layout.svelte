@@ -61,6 +61,8 @@
 <svelte:head>
 	<link rel="icon" href={favicon} />
 	{@html pwaInfo?.webManifest.linkTag}
+	<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7697856511202116"
+     crossorigin="anonymous"></script>
 </svelte:head>
 
 <div class="app-layout">
