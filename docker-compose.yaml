@@ -1,0 +1,33 @@
+services:
+  server:
+    build:
+      context: .
+      dockerfile: docker/server/dockerfile
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    volumes:
+      - db-data:/app/db
+      - pdf-cache:/app/.cache
+    ports:
+      - "3000:3000"
+
+  client:
+    build:
+      context: .
+      dockerfile: docker/client/dockerfile
+      args:
+        VITE_API_BASE_URL: http://server:3000
+    depends_on:
+      - server
+    volumes:
+      - ./ssl:/etc/nginx/ssl:ro
+    ports:
+      - "8080:80"
+      - "8443:443"
+
+volumes:
+  db-data:
+  pdf-cache:

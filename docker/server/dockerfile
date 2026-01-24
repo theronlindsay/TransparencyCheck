@@ -1,0 +1,48 @@
+FROM node:20-bookworm-slim AS build
+
+WORKDIR /app
+
+# Tools for native deps (sqlite3)
+RUN apt-get update \
+	&& apt-get install -y python3 make g++ \
+	&& rm -rf /var/lib/apt/lists/*
+
+# Copy root and app package files
+COPY package*.json ./
+COPY apps/server/package.json ./apps/server/
+COPY apps/client/package.json ./apps/client/
+
+# Copy lock files if they exist (for deterministic builds)
+COPY package-lock.json* ./
+COPY apps/server/package-lock.json* ./apps/server/ 2>/dev/null || true
+COPY apps/client/package-lock.json* ./apps/client/ 2>/dev/null || true
+
+# Install all dependencies (workspace aware)
+RUN npm install
+
+COPY . .
+
+# Build server only
+RUN npm run build:server
+
+# Prune dev dependencies from workspaces
+RUN npm prune --omit=dev --workspaces
+
+FROM node:20-bookworm-slim AS runtime
+
+WORKDIR /app
+ENV NODE_ENV=production
+
+# Copy only server files needed at runtime
+COPY --from=build /app/package*.json ./
+COPY --from=build /app/apps/server/package*.json ./apps/server/
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/apps/server/node_modules ./apps/server/node_modules
+COPY --from=build /app/apps/server/build ./apps/server/build
+COPY --from=build /app/static ./static
+
+RUN mkdir -p /app/db /app/.cache
+
+EXPOSE 3000
+
+CMD ["node", "-r", "dotenv/config", "apps/server/build"]

@@ -1,0 +1,31 @@
+FROM node:20-bookworm-slim AS build
+
+WORKDIR /app
+
+# Copy root and app package files
+COPY package*.json ./
+COPY apps/client/package.json ./apps/client/
+COPY apps/server/package.json ./apps/server/
+
+# Copy lock files if they exist
+COPY package-lock.json* ./
+COPY apps/client/package-lock.json* ./apps/client/ 2>/dev/null || true
+COPY apps/server/package-lock.json* ./apps/server/ 2>/dev/null || true
+
+# Install all dependencies (workspace aware)
+RUN npm install
+
+COPY . .
+
+ARG VITE_API_BASE_URL
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+
+# Build client only
+RUN npm run build:client
+
+FROM nginx:alpine
+
+COPY docker/client/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/apps/client/build /usr/share/nginx/html
+
+EXPOSE 80 443
