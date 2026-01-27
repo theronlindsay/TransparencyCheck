@@ -9,8 +9,7 @@ COPY apps/server/package.json ./apps/server/
 
 # Copy lock files if they exist
 COPY package-lock.json* ./
-COPY apps/client/package-lock.json* ./apps/client/ 2>/dev/null || true
-COPY apps/server/package-lock.json* ./apps/server/ 2>/dev/null || true
+RUN mkdir -p ./apps/client ./apps/server
 
 # Install all dependencies (workspace aware)
 RUN npm install

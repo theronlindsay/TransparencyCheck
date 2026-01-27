@@ -14,8 +14,11 @@ COPY apps/client/package.json ./apps/client/
 
 # Copy lock files if they exist (for deterministic builds)
 COPY package-lock.json* ./
-COPY apps/server/package-lock.json* ./apps/server/ 2>/dev/null || true
-COPY apps/client/package-lock.json* ./apps/client/ 2>/dev/null || true
+RUN mkdir -p ./apps/server ./apps/client
+RUN if [ -f /app/package-lock.json ]; then \
+      cp /app/package-lock.json ./apps/server/ 2>/dev/null || true; \
+      cp /app/package-lock.json ./apps/client/ 2>/dev/null || true; \
+    fi
 
 # Install all dependencies (workspace aware)
 RUN npm install

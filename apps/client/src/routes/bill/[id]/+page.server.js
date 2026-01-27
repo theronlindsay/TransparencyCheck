@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { getBillById, getBillTextVersions, getBillActions, execute, query, initDatabase } from '$lib/db.js';
+import { getBillById, getBillTextVersions, getBillActions, execute, initDatabase } from '$lib/db.js';
 import { env } from '$env/dynamic/private';
 
 const CONGRESS_API_KEY = env.CONGRESS_API_KEY;

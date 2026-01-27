@@ -195,6 +195,27 @@ npm run install:all      # Install all workspace dependencies
 - **Mobile**: Capacitor (Android)
 - **Deployment**: Docker, Nginx, PM2
 
+## Docker Deployment
+
+The docker-compose setup builds and deploys both apps:
+
+- **Client**: Nginx serving static files on port 8080 (HTTP) and 8443 (HTTPS)
+- **Server**: Node.js API server on port 3000
+
+See [README-SSL.md](README-SSL.md) for HTTPS setup.
+
+## Capacitor Mobile App
+
+The client app can be built as an Android app using Capacitor:
+
+```bash
+cd apps/client
+npx cap sync android
+npx cap open android
+```
+
+See [capacitor.config.json](capacitor.config.json) for mobile app configuration.
+
 ## Configuration Files
 
 Each app has its own:
