@@ -9,9 +9,9 @@
 	import { pwaInfo } from 'virtual:pwa-info';
 	import '../lib/styles/theme.css';
 
-	import GoogleAdsense from "./Adsense.svelte";
-	import GoogleAnalytics from "./Analytics.svelte";
-	export const promotionEnabled = writable(true);  
+	import GoogleAdsense from "$lib/Components/Adsense.svelte";
+	import GoogleAnalytics from "$lib/Components/Analytics.svelte";
+	let promotionEnabled = $state(true);
 
 	let { children } = $props();
 	let isScrolled = $state(false);
@@ -62,8 +62,8 @@
 	});
 </script>
 
-<GoogleAnalytics enabled={$promotionEnabled} />
-<GoogleAdsense enabled={$promotionEnabled} />
+<GoogleAnalytics enabled={promotionEnabled} />
+<GoogleAdsense enabled={promotionEnabled} />
 
 <svelte:head>
 	<link rel="icon" href={favicon} />

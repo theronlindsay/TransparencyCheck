@@ -6,7 +6,7 @@
 import { mkdir } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { getDatabase, closeDatabase } from './connection.js';
+import { getDatabase } from './connection.js';
 import { tables, tableOrder } from './schema.js';
 import { createTable } from './migrations.js';
 
@@ -40,7 +40,9 @@ export async function initDatabase() {
 		}
 		
 		console.log('✅ Database initialization complete!');
-		return db;
+		
+		// Close the database connection used for initialization
+		db.close();
 	} catch (error) {
 		console.error('❌ Database initialization failed:', error);
 		db.close();
@@ -59,5 +61,6 @@ export {
 	getBillById, 
 	getBillTextVersions, 
 	getBillActions,
-	saveBillActions 
+	saveBillActions,
+	fetchAndStoreTextVersions
 } from './bills.js';

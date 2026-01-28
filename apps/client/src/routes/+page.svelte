@@ -20,7 +20,7 @@
 	let hasSearched = $state(false);
 	let searchCongress = $state(false);
 	let shouldShowCongressPrompt = $state(false);
-	let isLoading = $state(true);
+	let isLoading = $state(false);
 	let error = $state(null);
 
 	export const snapshot = {
@@ -81,7 +81,7 @@
 
 	// Fetch bills on mount (client-side)
 	$effect(() => {
-		if (browser && billsData.length === 0 && !error) {
+		if (browser && billsData.length === 0 && !error && !isLoading) {
 			isLoading = true;
 			fetchBillsFromAPI();
 		}

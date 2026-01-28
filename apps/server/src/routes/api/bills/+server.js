@@ -1,11 +1,38 @@
 import { json } from '@sveltejs/kit';
 import { initDatabase, query } from '$lib/db.js';
+import { fetchAndStoreBills } from '$lib/bill-fetcher.js';
 
 const corsHeaders = {
 	'Access-Control-Allow-Origin': '*',
 	'Access-Control-Allow-Methods': 'GET, OPTIONS',
 	'Access-Control-Allow-Headers': 'Content-Type'
 };
+
+// Flag to ensure background job only runs once
+let backgroundJobStarted = false;
+
+/**
+ * Kick off background job to fetch recent bills (last 3 days)
+ */
+async function startBackgroundJob() {
+	if (backgroundJobStarted) return;
+	backgroundJobStarted = true;
+	
+	console.log('🔄 Starting background job to fetch recent bills...');
+	try {
+		const dateTo = new Date();
+		const dateFrom = new Date();
+		dateFrom.setDate(dateTo.getDate() - 3);
+
+		const fromString = dateFrom.toISOString().split('T')[0];
+		const toString = dateTo.toISOString().split('T')[0];
+
+		await fetchAndStoreBills({ dateFrom: fromString, dateTo: toString });
+		console.log('✅ Background job: Finished fetching recent bills.');
+	} catch (error) {
+		console.error('❌ Background job: Error fetching recent bills:', error);
+	}
+}
 
 export async function OPTIONS() {
 	return new Response(null, { headers: corsHeaders });
@@ -14,6 +41,13 @@ export async function OPTIONS() {
 export async function GET() {
 	try {
 		await initDatabase();
+		
+		// Start background job on first request (non-blocking)
+		if (!backgroundJobStarted) {
+			startBackgroundJob().catch(err => {
+				console.error('Background job failed:', err);
+			});
+		}
 		
 		const billsWithData = await query(`
 			SELECT 

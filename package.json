@@ -11,7 +11,13 @@
 		"build": "npm run build:client && npm run build:server",
 		"install:all": "npm install && npm install --workspaces",
 		"format": "prettier --write .",
-		"lint": "prettier --check . && eslint ."
+		"lint": "prettier --check . && eslint .",
+		"docker:build": "podman-compose build",
+		"docker:up": "podman-compose up -d",
+		"docker:down": "podman-compose down",
+		"docker:logs": "podman-compose logs -f",
+		"docker:restart": "podman-compose restart",
+		"deploy": "npm run build && podman-compose up -d --build"
 	},
 	"workspaces": [
 		"apps/client",

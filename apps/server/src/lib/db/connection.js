@@ -10,8 +10,8 @@ import { dirname, join } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Path to the database file
-const dbPath = join(__dirname, '..', '..', '..', 'db', 'transparency.sqlite');
+// Path to the database file - use env variable or default to project root
+const dbPath = process.env.DB_PATH || join(__dirname, '..', '..', '..', 'db', 'transparency.sqlite');
 
 /**
  * Get a database connection

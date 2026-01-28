@@ -2,7 +2,7 @@
  * Bill-related database operations
  */
 
-import { query, queryOne } from './queries.js';
+import { query, queryOne, execute } from './queries.js';
 import { getDatabase } from './connection.js';
 import { fetchAndStoreBills } from '../bill-fetcher.js';
 
@@ -224,4 +224,89 @@ export async function syncAndFetchBills() {
     // If sync fails, still try to return existing bills
     return await getRecentBills(20);
   }
+}
+
+/**
+ * Fetch text versions from Congress.gov API and store in database
+ * @param {string} billId - The bill ID (e.g., "HR3062")
+ * @param {string} textVersionsUrl - The API URL for text versions
+ * @param {string} apiKey - Congress.gov API key
+ * @returns {Promise<Array>} - Array of stored text versions
+ */
+export async function fetchAndStoreTextVersions(billId, textVersionsUrl, apiKey) {
+	const url = `${textVersionsUrl}&api_key=${apiKey}`;
+	console.log(`\n🔄 Fetching text versions for ${billId}`);
+	console.log(`   URL: ${url}`);
+	
+	try {
+		const response = await fetch(url);
+		if (!response.ok) {
+			throw new Error(`Failed to fetch text versions: ${response.status}`);
+		}
+		
+		const data = await response.json();
+		const textVersions = data.textVersions || [];
+		
+		console.log(`📦 Found ${textVersions.length} text versions in API response`);
+		
+		if (textVersions.length === 0) {
+			return [];
+		}
+		
+		// Store each text version with its formats
+		for (const version of textVersions) {
+			if (!version.formats || !Array.isArray(version.formats)) {
+				continue;
+			}
+			
+			for (const format of version.formats) {
+				try {
+					// Insert the metadata
+					await execute(`
+						INSERT OR REPLACE INTO bill_text_versions 
+						(billId, type, date, formatType, url, content, contentFetched)
+						VALUES (?, ?, ?, ?, ?, NULL, 0)
+					`, [
+						billId,
+						version.type || null,
+						version.date || null,
+						format.type || null,
+						format.url || null
+					]);
+					
+					// Download content for HTML/Text formats
+					const formatType = format.type?.toUpperCase();
+					if (formatType === 'FORMATTED TEXT' || formatType?.includes('HTM')) {
+						try {
+							const contentResponse = await fetch(format.url);
+							const content = await contentResponse.text();
+							
+							await execute(`
+								UPDATE bill_text_versions 
+								SET content = ?, contentFetched = 1
+								WHERE billId = ? AND type = ? AND formatType = ?
+							`, [
+								content,
+								billId,
+								version.type || null,
+								format.type || null
+							]);
+							
+							console.log(`  ✅ Content stored for ${version.type} (${format.type})`);
+						} catch (contentErr) {
+							console.error(`  ❌ Error downloading content:`, contentErr.message);
+						}
+					}
+				} catch (err) {
+					console.error(`  ❌ Error storing text version:`, err.message);
+				}
+			}
+		}
+		
+		// Return the stored versions
+		return await getBillTextVersions(billId);
+	} catch (error) {
+		console.error(`Error fetching text versions for ${billId}:`, error);
+		return [];
+	}
 }

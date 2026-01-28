@@ -1,5 +1,8 @@
 import { json } from '@sveltejs/kit';
-import { getBillById, getBillTextVersions, getBillActions, initDatabase } from '$lib/db.js';
+import { getBillById, getBillTextVersions, getBillActions, initDatabase, fetchAndStoreTextVersions } from '$lib/db.js';
+import { env } from '$env/dynamic/private';
+
+const CONGRESS_API_KEY = env.CONGRESS_API_KEY;
 
 const corsHeaders = {
 	'Access-Control-Allow-Origin': '*',
@@ -22,7 +25,24 @@ export async function GET({ params }) {
 		}
 
 		// Get text versions and actions
-		const textVersions = await getBillTextVersions(params.id);
+		let textVersions = await getBillTextVersions(params.id);
+		
+		// If no text versions in database and we have a textVersionsUrl, fetch them
+		if (textVersions.length === 0 && billData.textVersionsUrl && CONGRESS_API_KEY) {
+			console.log(`📥 Fetching text versions for ${params.id} from Congress.gov`);
+			try {
+				textVersions = await fetchAndStoreTextVersions(
+					params.id, 
+					billData.textVersionsUrl,
+					CONGRESS_API_KEY
+				);
+				console.log(`✅ Fetched and stored ${textVersions.length} text versions`);
+			} catch (err) {
+				console.error('Error fetching text versions:', err);
+				// Continue even if text versions fail
+			}
+		}
+		
 		const actions = await getBillActions(params.id);
 
 		// Format the bill data

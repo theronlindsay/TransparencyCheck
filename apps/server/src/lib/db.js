@@ -14,5 +14,6 @@ export {
 	getBillById, 
 	getBillTextVersions, 
 	getBillActions,
-	saveBillActions 
+	saveBillActions,
+	fetchAndStoreTextVersions
 } from './db/index.js';

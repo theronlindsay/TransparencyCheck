@@ -42,7 +42,6 @@ COPY --from=build /app/apps/server/package*.json ./apps/server/
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/apps/server/node_modules ./apps/server/node_modules
 COPY --from=build /app/apps/server/build ./apps/server/build
-COPY --from=build /app/static ./static
 
 RUN mkdir -p /app/db /app/.cache
 

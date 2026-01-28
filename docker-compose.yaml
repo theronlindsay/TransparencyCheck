@@ -8,6 +8,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
+      - DB_PATH=/app/db/transparency.sqlite
     volumes:
       - db-data:/app/db
       - pdf-cache:/app/.cache
@@ -19,14 +20,12 @@ services:
       context: .
       dockerfile: docker/client/dockerfile
       args:
-        VITE_API_BASE_URL: http://server:3000
+        VITE_API_BASE_URL: http://localhost:3000
     depends_on:
       - server
-    volumes:
-      - ./ssl:/etc/nginx/ssl:ro
     ports:
-      - "8080:80"
-      - "8443:443"
+      - "8081:80"  # Change to 8080:80 for production server
+      # - "8443:443"
 
 volumes:
   db-data:
