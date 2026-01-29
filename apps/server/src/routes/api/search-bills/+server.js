@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { fetchAndStoreBills } from '$lib/bill-fetcher.js';
-import { initDatabase } from '$lib/db.js';
+import { initDatabase } from '$lib/db';
 
 // Helper function to determine bill status from API data
 // This is kept here for formatting the response, as the fetcher module only stores raw data.
