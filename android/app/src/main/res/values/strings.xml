@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">Transparency Check</string>
-    <string name="title_activity_main">Transparency Check</string>
-    <string name="package_name">com.chimeraware.transparencycheck</string>
-    <string name="custom_url_scheme">com.chimeraware.transparencycheck</string>
-</resources>
