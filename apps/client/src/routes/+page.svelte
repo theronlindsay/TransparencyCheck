@@ -57,8 +57,9 @@
 			serverSearchResults = value.serverSearchResults;
 			hasSearched = value.hasSearched;
 			searchCongress = value.searchCongress;
-			isLoading = value.isLoading;
-			error = value.error;
+			// Don't restore loading/error states - let fresh fetch handle them
+			// isLoading = value.isLoading;
+			// error = value.error;
 		}
 	};
 
@@ -66,6 +67,7 @@
 	async function fetchBillsFromAPI() {
 		try {
 			console.log('Fetching bills from:', apiUrl('/api/bills'));
+			error = null; // Clear any previous errors
 			const response = await fetch(apiUrl('/api/bills'));
 			console.log('Response status:', response.status, response.ok);
 			if (!response.ok) {
@@ -76,6 +78,7 @@
 			console.log('First bill sample:', bills[0]);
 			billsData = bills;
 			isLoading = false;
+			console.log('State updated - isLoading:', isLoading, 'error:', error, 'billsData.length:', billsData.length);
 		} catch (err) {
 			console.error('Error fetching bills:', err);
 			error = err.message;
