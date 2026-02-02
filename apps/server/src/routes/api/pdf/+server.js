@@ -74,6 +74,7 @@ export async function GET({ url }) {
 			
 			if (!response.ok) {
 				console.log('❌ Failed to fetch PDF:', response.status);
+				console.log(`Error: ${err}`)
 				console.log('========================================\n');
 				throw new Error(`Failed to fetch PDF: ${response.status}`);
 			}
