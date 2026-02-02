@@ -20,7 +20,9 @@ services:
       context: .
       dockerfile: docker/client/dockerfile
       args:
-        VITE_API_BASE_URL: http://transparencycheck.app:3000
+        VITE_API_BASE_URL: https://transparencycheck.app:3000 #This needs to be the live URL of the server you are hosting on
+                                                             # If you don't have a URL, change this to http://localhost:3000 if running locally
+                                                             # Or if running remotely with no url, change it to http://yourserverip:3000
     depends_on:
       - server
     ports:
