@@ -926,37 +926,6 @@
 		margin-bottom: 1rem;
 	}
 
-	.back-button {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.5rem 1rem;
-		background: var(--bg-secondary);
-		border: 1px solid var(--border-color);
-		border-radius: var(--radius-md);
-		color: var(--text-primary);
-		font-size: 0.95rem;
-		font-weight: 500;
-		cursor: pointer;
-		transition: all 0.2s ease;
-		text-decoration: none;
-	}
-
-	.back-button:hover {
-		background: var(--bg-primary);
-		border-color: var(--accent);
-		color: var(--accent);
-		transform: translateX(-2px);
-	}
-
-	.back-button svg {
-		transition: transform 0.2s ease;
-	}
-
-	.back-button:hover svg {
-		transform: translateX(-3px);
-	}
-
 	.bill-number {
 		font-size: 1.1rem;
 		font-weight: 600;
@@ -1006,11 +975,6 @@
 		font-weight: 500;
 	}
 
-	.status-value {
-		color: var(--accent);
-		font-weight: 600;
-		text-transform: capitalize;
-	}
 
 	.action-buttons {
 		display: flex;
@@ -1049,18 +1013,6 @@
 		background: #ff5b58;
 		transform: translateY(-2px);
 		box-shadow: 0 6px 20px rgba(241, 58, 55, 0.4);
-	}
-
-	.button.secondary {
-		background: rgba(241, 58, 55, 0.1);
-		color: var(--text-primary);
-		border: 1px solid rgba(241, 58, 55, 0.3);
-	}
-
-	.button.secondary:hover {
-		background: rgba(241, 58, 55, 0.2);
-		border-color: rgba(241, 58, 55, 0.5);
-		transform: translateY(-2px);
 	}
 
 	.section {
@@ -1225,114 +1177,6 @@
 	.news-link:hover {
 		color: #ff5b58;
 		transform: translateX(4px);
-	}
-
-	/* Full Text Section */
-	.full-text {
-		background: var(--bg-secondary);
-		border: 1px solid var(--border-color);
-		border-radius: var(--radius-lg);
-		padding: 2rem;
-	}
-
-	.section-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-bottom: 1.5rem;
-		padding-bottom: 0.75rem;
-		border-bottom: 2px solid var(--border-color);
-	}
-
-	.section-header h2 {
-		margin: 0;
-		padding: 0;
-		border: none;
-	}
-
-	.source-link {
-		font-size: 0.9rem;
-		color: var(--accent);
-		text-decoration: none;
-		font-weight: 600;
-		transition: all var(--transition-base);
-	}
-
-	.source-link:hover {
-		color: #ff5b58;
-	}
-
-	.format-info {
-		font-size: 0.85rem;
-		color: var(--text-secondary);
-		margin: 0 0 1.5rem 0;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-	}
-
-	.bill-text-content {
-		background: rgba(0, 0, 0, 0.2);
-		border-radius: var(--radius-md);
-		padding: 2rem;
-		margin: 1.5rem 0;
-		max-height: 800px;
-		overflow-y: auto;
-		border: 1px solid var(--border-color);
-	}
-
-	.bill-text-content :global(p) {
-		color: var(--text-primary);
-		line-height: 1.8;
-		margin: 1rem 0;
-		font-size: 1rem;
-	}
-
-	.bill-text-content :global(pre) {
-		background: rgba(0, 0, 0, 0.3);
-		padding: 1.5rem;
-		border-radius: var(--radius-sm);
-		overflow-x: auto;
-		white-space: pre-wrap;
-		word-wrap: break-word;
-		color: var(--text-primary);
-		font-family: 'Courier New', Courier, monospace;
-		font-size: 0.9rem;
-		line-height: 1.6;
-		border: 1px solid var(--border-color);
-	}
-
-	.bill-text-content :global(h1),
-	.bill-text-content :global(h2),
-	.bill-text-content :global(h3),
-	.bill-text-content :global(h4),
-	.bill-text-content :global(h5),
-	.bill-text-content :global(h6) {
-		color: var(--text-primary);
-		margin-top: 2rem;
-		margin-bottom: 1rem;
-	}
-
-	.fetched-info {
-		font-size: 0.8rem;
-		color: var(--text-secondary);
-		margin: 1rem 0 0 0;
-		text-align: right;
-		font-style: italic;
-	}
-
-	.full-text-unavailable {
-		padding: 2rem;
-		background: var(--bg-secondary);
-		border-radius: var(--radius-lg);
-		border: 1px solid var(--border-color);
-		text-align: center;
-	}
-
-	.unavailable-reason {
-		color: var(--text-secondary);
-		margin: 1rem 0 1.5rem 0;
-		font-size: 1.05rem;
 	}
 
 	/* Text Versions Styles */

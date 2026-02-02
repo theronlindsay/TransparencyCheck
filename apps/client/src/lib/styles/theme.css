@@ -1,3 +1,6 @@
+/* svelte-ignore css_unused_selector */
+/* This is a global theme file - selectors are used across multiple components */
+
 :root {
     --bg-primary: #141212;
     --bg-secondary: rgba(36, 32, 32, 0.8);

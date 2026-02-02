@@ -7,8 +7,7 @@
 		<iframe
 			src={url}
 			title="PDF Viewer"
-			class="pdf-iframe"
-		/>
+			class="pdf-iframe" ></iframe>
 	{:else}
 		<div class="no-pdf">No PDF URL provided</div>
 	{/if}
