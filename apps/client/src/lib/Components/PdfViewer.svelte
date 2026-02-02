@@ -18,7 +18,12 @@
 
 	// Set worker source
 	onMount(() => {
-		pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+		try {
+			pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+			console.log('PDF worker source set to:', pdfjsWorker);
+		} catch (err) {
+			console.error('Failed to set PDF worker:', err);
+		}
 	});
 
 	$effect(() => {
