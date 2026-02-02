@@ -65,11 +65,15 @@
 	// Fetch bills client-side
 	async function fetchBillsFromAPI() {
 		try {
+			console.log('Fetching bills from:', apiUrl('/api/bills'));
 			const response = await fetch(apiUrl('/api/bills'));
+			console.log('Response status:', response.status, response.ok);
 			if (!response.ok) {
 				throw new Error(`Failed to fetch bills: ${response.status}`);
 			}
 			const bills = await response.json();
+			console.log('Bills fetched:', bills.length, 'bills');
+			console.log('First bill sample:', bills[0]);
 			billsData = bills;
 			isLoading = false;
 		} catch (err) {
