@@ -1,94 +1,74 @@
 import { env } from '$env/dynamic/private';
-import { execute, query } from '$lib/db.js';
+import { execute } from '$lib/db.js';
+import { getMongoClient } from '$lib/db/mongo.js';
+
+const mongoMode = true; // Toggles database provider
 
 const CONGRESS_API_KEY = env.CONGRESS_API_KEY;
 
-// Helper function to determine bill status from API data
-function determineBillStatus(bill) {
-	const latestActionText = bill.latestAction?.text?.toLowerCase() || '';
-	
-	if (latestActionText.includes('became public law') || 
-	    latestActionText.includes('became private law') ||
-	    latestActionText.includes('signed by president')) {
-		return 'Enacted';
-	}
-	
-	if (latestActionText.includes('vetoed') || 
-	    latestActionText.includes('veto message')) {
-		return 'Vetoed';
-	}
-	
-	if (latestActionText.includes('failed') || 
-	    latestActionText.includes('rejected') ||
-	    latestActionText.includes('motion to proceed rejected')) {
-		return 'Failed';
-	}
-	
-	if (latestActionText.includes('passed senate') || 
-	    latestActionText.includes('received in the senate')) {
-		return 'Passed House';
-	}
-	
-	if (latestActionText.includes('passed house') || 
-	    latestActionText.includes('received in the house')) {
-		return 'Passed Senate';
-	}
-	
-	if (latestActionText.includes('referred to') || 
-	    latestActionText.includes('committee on')) {
-		return 'In Committee';
-	}
-	
-	if (latestActionText.includes('introduced in') || 
-	    bill.introducedDate) {
-		return 'Introduced';
-	}
-	
-	return 'Active';
-}
+async function addBillToMongo(billId, billStatus, detailedBill){
+	let mongo;
+	try {
+		mongo = await getMongoClient();
+		const billCollection = mongo.db("AppData").collection("Bills");
 
-// Fetch detailed bill information
-async function getBillDetails(billUrl) {
-	if (!CONGRESS_API_KEY) {
-		throw new Error('CONGRESS_API_KEY is not defined');
-	}
-	const url = `${billUrl}?format=json&api_key=${CONGRESS_API_KEY}`;
-	const response = await fetch(url);
-	if (!response.ok) {
-		console.error(`Failed to fetch bill details from ${url}. Status: ${response.status}`);
-		return null;
-	}
-	const data = await response.json();
-	return data.bill;
-}
+		const insertedResult = await billCollection.updateOne(
+			{_id: billId }, 
+			{$set: 
+				{
+					id: billId,
+					billNumber: detailedBill.number,
+					congress: detailedBill.congress,
+					type: detailedBill.type,
+					introducedDate: detailedBill.introducedDate,
+					latestAction: JSON.stringify(detailedBill.latestAction) || null,
+					status: billStatus,
+					originChamber: detailedBill.originChamber, 
+					originChamberCode: detailedBill.originChamberCode, 
+					title: detailedBill.title, 
+					updateDate: detailedBill.updateDate,
+					updateDateIncludingText: detailedBill.updateDateIncludingText, 
+					legislationUrl:  detailedBill.legislationUrl,
+					policyArea: JSON.stringify(detailedBill.policyArea) ||detailedBill.policyArea|| null, 
+					actionsCount: detailedBill.actionsCount, 
+					actionsUrl: detailedBill.actionsUrl, 
+					committees: detailedBill.committees, 
+					comitteesCount: detailedBill.comitteesCount,
+					comitteesUrl: detailedBill.comitteesUrl, 
+					cosponsorsCount: detailedBill.cosponsorsCount, 
+					cosponsorsUrl: detailedBill.cosponsorsUrl, 
+					relatedBillsCount: detailedBill.relatedBillsCount, 
+					relatedBillsUrl: detailedBill.relatedBillsUrl,
+					sponsors: JSON.stringify(detailedBill.sponsors) || detailedBill.sponsors,
+					subjectsCount: detailedBill.subjectsCount, 
+					subjectsUrl: detailedBill.subjectsUrl, 
+					summariesCount: detailedBill.summariesCount, 
+					summaraiesUrl: detailedBill.summaraiesUrl, 
+					textVersionsCount: detailedBill.textVersionsCount,
+					textVersionsUrl: detailedBill.textVersionsUrl, 
+					titlesCount: detailedBill.titlesCount, 
+					titlesUrl:  detailedBill.titlesUrl
+				}
+			},
+			{ upsert: true}	
+		);
 
-// Save bill to database
-async function saveBillToDatabase(bill) {
-	const billId = `${bill.type}${bill.number}`;
-	
-	const existingBill = await query(
-		`SELECT id FROM bills WHERE id = ?`,
-		[billId]
-	);
-	
-	if (existingBill.length > 0) {
-		return billId;
-	}
+		const upsertedId = insertedResult.upsertedId?._id;
+		console.log("Upserted document:", upsertedId ?? billId);
 
-	let detailedBill = bill;
-	if (bill.url) {
-		try {
-			const details = await getBillDetails(bill.url);
-			if (details) {
-				detailedBill = details;
-			}
-		} catch (error) {
-			console.error(`Error fetching details for ${bill.number}:`, error);
+
+	} catch (error) {
+    	console.error("❌ Error:", error.message);
+  	} finally {
+		if (mongo) {
+			await mongo.close();
 		}
-	}
+  	}
 
-	const billStatus = determineBillStatus(detailedBill);
-	
+}
+
+async function addBillToSQL(billId, billStatus, detailedBill){
+
 	await execute(
 		`INSERT OR REPLACE INTO bills 
 		(id, billNumber, congress, type, introducedDate, latestAction, status, originChamber, originChamberCode, 
@@ -173,11 +153,103 @@ async function saveBillToDatabase(bill) {
 			}
 		}
 	}
+}
+
+// Helper function to determine bill status from API data
+function determineBillStatus(bill) {
+	/**
+	 * Extracts and normalizes the latest action text from a bill object.
+	 * Converts the text to lowercase for case-insensitive comparison,
+	 * or defaults to an empty string if no action text is available.
+	 */
+	const latestActionText = bill.latestAction?.text?.toLowerCase() || ''; 
+	
+	if (latestActionText.includes('became public law') || 
+	    latestActionText.includes('became private law') ||
+	    latestActionText.includes('signed by president')) {
+		return 'Enacted';
+	}
+	
+	if (latestActionText.includes('vetoed') || 
+	    latestActionText.includes('veto message')) {
+		return 'Vetoed';
+	}
+	
+	if (latestActionText.includes('failed') || 
+	    latestActionText.includes('rejected') ||
+	    latestActionText.includes('motion to proceed rejected')) {
+		return 'Failed';
+	}
+	
+	if (latestActionText.includes('passed senate') || 
+	    latestActionText.includes('received in the senate')) {
+		return 'Passed House';
+	}
+	
+	if (latestActionText.includes('passed house') || 
+	    latestActionText.includes('received in the house')) {
+		return 'Passed Senate';
+	}
+	
+	if (latestActionText.includes('referred to') || 
+	    latestActionText.includes('committee on')) {
+		return 'In Committee';
+	}
+	
+	if (latestActionText.includes('introduced in') || 
+	    bill.introducedDate) {
+		return 'Introduced';
+	}
+	
+	return 'Active';
+}
+
+// Fetch detailed bill information
+async function getBillDetails(billUrl) {
+	if (!CONGRESS_API_KEY) {
+		throw new Error('CONGRESS_API_KEY is not defined');
+	}
+	const url = `${billUrl}?format=json&api_key=${CONGRESS_API_KEY}`;
+	const response = await fetch(url);
+	if (!response.ok) {
+		console.error(`Failed to fetch bill details from ${url}. Status: ${response.status}`);
+		return null;
+	}
+	const data = await response.json();
+	return data.bill;
+}
+
+// Save bill to database
+async function saveBillToDatabase(bill) {
+	//Get ID
+	const billId = `${bill.type}${bill.number}`;
+
+	let detailedBill = bill;
+	if (bill.url) {
+		try {
+			const details = await getBillDetails(bill.url);
+			if (details) {
+				detailedBill = details;
+			}
+		} catch (error) {
+			console.error(`Error fetching details for ${bill.number}:`, error);
+		}
+	}
+
+	const billStatus = determineBillStatus(detailedBill);
+
+
+	//TOGGLE SQL AND MONGO HERE
+	if(mongoMode){
+		await addBillToMongo(billId, billStatus, detailedBill);
+	} else {
+		await addBillToSQL(billId, billStatus, detailedBill);
+	}
 
 	return billId;
 }
 
-export async function fetchAndStoreBills({ searchQuery, dateFrom, dateTo, limit = 250 } = {}) {
+export async function fetchAndStoreBills({ searchQuery, dateFrom, dateTo, limit = 40 } = {}) {
     if (!CONGRESS_API_KEY) {
 		throw new Error('CONGRESS_API_KEY is not defined');
 	}
