@@ -1,6 +1,7 @@
 /**
  * Database table schemas
  * Each table definition includes the CREATE TABLE statement and any indexes
+ * This is only needed for SQL
  */
 
 export const tables = {

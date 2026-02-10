@@ -2,9 +2,7 @@
  * Common database query functions
  */
 
-import { getMongoClient } from './mongo.js';
-
-//this file should be changed to use mongo
+import { getDatabase } from './connection.js';
 
 /**
  * Execute a query that returns multiple rows (SELECT queries)

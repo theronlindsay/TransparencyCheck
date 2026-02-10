@@ -2,9 +2,9 @@
  * Bill-related database operations
  */
 
-import { query, queryOne, execute } from './sql/queries.js';
-import { getDatabase } from './sql/connection.js';
-import { fetchAndStoreBills } from '../bill-fetcher.js';
+import { query, queryOne, execute } from './queries.js';
+import { getDatabase } from './connection.js';
+import { fetchAndStoreBills } from '../../bill-fetcher.js';
 
 /**
  * Get a bill by ID with its sponsors and committees

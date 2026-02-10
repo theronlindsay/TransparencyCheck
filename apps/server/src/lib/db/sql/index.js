@@ -8,7 +8,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { getDatabase } from './connection.js';
 import { tables, tableOrder } from './schema.js';
-import { createTable } from './migrations.js';
+import { createTable } from '../../../../dep/migrations.js';
 
 // Get the current file's directory
 const __filename = fileURLToPath(import.meta.url);
@@ -17,6 +17,7 @@ const __dirname = dirname(__filename);
 /**
  * Initialize the database
  * Creates all tables and applies migrations
+ * Not needed for mongo!
  */
 export async function initDatabase() {
 	console.log('🗄️  Initializing database...');

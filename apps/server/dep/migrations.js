@@ -9,7 +9,7 @@ export async function applyMigrations(db, tableName, migrations) {
 	if (!migrations || migrations.length === 0) return;
 
 	for (const migration of migrations) {
-		try {
+		try {{originChamber:'S'}
 			const needsMigration = await migration.check(db);
 			
 			if (needsMigration) {

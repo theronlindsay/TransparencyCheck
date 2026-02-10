@@ -16,4 +16,7 @@ export {
 	getBillActions,
 	saveBillActions,
 	fetchAndStoreTextVersions
-} from './db/index.js';
+} from './db/sql/index.js';
+
+// exporting from .db/sql/index.js will enable SQL
+// ./db/mongo.js will use mongo
