@@ -35,6 +35,6 @@
 		"prettier-plugin-svelte": "^3.3.3"
 	},
 	"dependencies": {
-		"mongodb": "^7.0.0"
+		"typeorm": "^0.3.28"
 	}
 }
