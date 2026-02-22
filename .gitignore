@@ -58,3 +58,4 @@ pdf_cache/
 android
 
 ssl
+apps/server/src/lib/db/generated

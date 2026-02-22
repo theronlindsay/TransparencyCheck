@@ -21,13 +21,13 @@ const __dirname = dirname(__filename);
  */
 export async function initDatabase() {
 	console.log('🗄️  Initializing database...');
-	
+
 	// Ensure the db directory exists
 	const dbDir = join(__dirname, '..', '..', '..', 'db');
 	await mkdir(dbDir, { recursive: true });
 
 	const db = await getDatabase();
-	
+
 	try {
 		// Create tables in order (respects foreign key dependencies)
 		for (const tableName of tableOrder) {
@@ -36,12 +36,12 @@ export async function initDatabase() {
 				console.warn(`⚠️  No schema found for table: ${tableName}`);
 				continue;
 			}
-			
+
 			await createTable(db, tableName, tableSchema);
 		}
-		
+
 		console.log('✅ Database initialization complete!');
-		
+
 		// Close the database connection used for initialization
 		db.close();
 	} catch (error) {
@@ -58,9 +58,9 @@ export { getDatabase, closeDatabase } from './connection.js';
 export { query, queryOne, execute, transaction } from './queries.js';
 
 // Re-export bill-specific functions
-export { 
-	getBillById, 
-	getBillTextVersions, 
+export {
+	getBillById,
+	getBillTextVersions,
 	getBillActions,
 	saveBillActions,
 	fetchAndStoreTextVersions

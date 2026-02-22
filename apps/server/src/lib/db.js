@@ -3,16 +3,16 @@
  * This file exists for backward compatibility with existing imports
  */
 
-export { 
-	initDatabase, 
-	getDatabase, 
+export {
+	initDatabase,
+	getDatabase,
 	closeDatabase,
-	query, 
-	queryOne, 
-	execute, 
+	query,
+	queryOne,
+	execute,
 	transaction,
-	getBillById, 
-	getBillTextVersions, 
+	getBillById,
+	getBillTextVersions,
 	getBillActions,
 	saveBillActions,
 	fetchAndStoreTextVersions

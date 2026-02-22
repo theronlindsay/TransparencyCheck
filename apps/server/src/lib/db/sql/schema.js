@@ -56,7 +56,7 @@ export const tables = {
 							else resolve(rows);
 						});
 					});
-					return !columns.some(col => col.name === 'status');
+					return !columns.some((col) => col.name === 'status');
 				},
 				apply: `ALTER TABLE bills ADD COLUMN status TEXT`
 			}
@@ -187,7 +187,7 @@ export const tables = {
 							else resolve(rows);
 						});
 					});
-					return !columns.some(col => col.name === 'content');
+					return !columns.some((col) => col.name === 'content');
 				},
 				apply: `ALTER TABLE bill_text_versions ADD COLUMN content TEXT`
 			},
@@ -200,7 +200,7 @@ export const tables = {
 							else resolve(rows);
 						});
 					});
-					return !columns.some(col => col.name === 'contentFetched');
+					return !columns.some((col) => col.name === 'contentFetched');
 				},
 				apply: `ALTER TABLE bill_text_versions ADD COLUMN contentFetched INTEGER DEFAULT 0`
 			}

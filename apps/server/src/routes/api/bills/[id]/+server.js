@@ -1,5 +1,10 @@
 import { json } from '@sveltejs/kit';
-import { getBillById, getBillTextVersions, getBillActions, initDatabase, fetchAndStoreTextVersions } from '$lib/db.js';
+import {
+	getBillById,
+	getBillTextVersions,
+	getBillActions,
+	fetchAndStoreTextVersions
+} from '$lib/db/bills.js';
 import { env } from '$env/dynamic/private';
 
 const CONGRESS_API_KEY = env.CONGRESS_API_KEY;
@@ -16,7 +21,6 @@ export async function OPTIONS() {
 
 export async function GET({ params }) {
 	try {
-		await initDatabase();
 
 		const billData = await getBillById(params.id);
 
@@ -26,13 +30,13 @@ export async function GET({ params }) {
 
 		// Get text versions and actions
 		let textVersions = await getBillTextVersions(params.id);
-		
+
 		// If no text versions in database and we have a textVersionsUrl, fetch them
 		if (textVersions.length === 0 && billData.textVersionsUrl && CONGRESS_API_KEY) {
 			console.log(`📥 Fetching text versions for ${params.id} from Congress.gov`);
 			try {
 				textVersions = await fetchAndStoreTextVersions(
-					params.id, 
+					params.id,
 					billData.textVersionsUrl,
 					CONGRESS_API_KEY
 				);
@@ -42,7 +46,7 @@ export async function GET({ params }) {
 				// Continue even if text versions fail
 			}
 		}
-		
+
 		const actions = await getBillActions(params.id);
 
 		// Format the bill data
@@ -69,7 +73,10 @@ export async function GET({ params }) {
 		console.error(`Error fetching bill ${params.id}:`, error);
 		// Log the full stack trace
 		if (error.stack) console.error(error.stack);
-		return json({ error: error.message, stack: error.stack }, { status: 500, headers: corsHeaders });
+		return json(
+			{ error: error.message, stack: error.stack },
+			{ status: 500, headers: corsHeaders }
+		);
 	}
 }
 
@@ -83,18 +90,18 @@ function formatSponsor(sponsors) {
 // Helper function to format bill number with type prefix
 function formatBillNumber(billNumber, billType) {
 	if (!billNumber) return '';
-	
+
 	const typeMap = {
-		'HR': 'H.R.',
-		'S': 'S.',
-		'HRES': 'H.RES.',
-		'SRES': 'S.RES.',
-		'HJRES': 'H.J.RES.',
-		'SJRES': 'S.J.RES.',
-		'HCONRES': 'H.CON.RES.',
-		'SCONRES': 'S.CON.RES.'
+		HR: 'H.R.',
+		S: 'S.',
+		HRES: 'H.RES.',
+		SRES: 'S.RES.',
+		HJRES: 'H.J.RES.',
+		SJRES: 'S.J.RES.',
+		HCONRES: 'H.CON.RES.',
+		SCONRES: 'S.CON.RES.'
 	};
-	
+
 	const prefix = typeMap[billType?.toUpperCase()] || billType || '';
 	return `${prefix}${billNumber}`;
 }

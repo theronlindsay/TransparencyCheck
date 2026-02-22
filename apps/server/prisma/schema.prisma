@@ -1,0 +1,124 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/lib/db/generated/client"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model Bill {
+  id                      String   @id @map("_id") // Custom ID (e.g., "hr123")
+  billNumber              String
+  congress                Int
+  type                    String?
+  introducedDate          String?
+  latestAction            String?
+  status                  String?
+  originChamber           String?
+  originChamberCode       String?
+  title                   String?
+  updateDate              String?
+  updateDateIncludingText String?
+  legislationUrl          String?
+  policyArea              String?
+  actionsCount            Int?
+  actionsUrl              String?
+  committeesCount         Int?
+  committeesUrl           String?
+  cosponsorsCount         Int?
+  cosponsorsUrl           String?
+  relatedBillsCount       Int?
+  relatedBillsUrl         String?
+  sponsors                String? // Storing JSON string
+  subjectsCount           Int?
+  subjectsUrl             String?
+  summariesCount          Int?
+  summaraiesUrl           String?
+  textVersionsCount       Int?
+  textVersionsUrl         String?
+  titlesCount             Int?
+  titlesUrl               String?
+
+  @@unique([billNumber, congress])
+}
+
+model Person {
+  bioguideId String  @id @map("_id")
+  firstName  String?
+  lastName   String?
+  fullName   String?
+  branch     String?
+  party      String?
+  state      String?
+  district   String?
+  donors     String? // Storing JSON string
+  url        String?
+}
+
+model BillPerson {
+  id           String  @id @default(auto()) @map("_id") @db.ObjectId
+  billId       String
+  personId     String
+  relationship String?
+  isByRequest  String?
+
+  @@unique([billId, personId, relationship])
+}
+
+model Committee {
+  committeeCode       String  @id @map("_id")
+  name                String?
+  chamber             String?
+  type                String?
+  subcommitteeCode    String?
+  parentCommitteeCode String?
+  url                 String?
+}
+
+model CommitteePerson {
+  id            String  @id @default(auto()) @map("_id") @db.ObjectId
+  committeeCode String
+  personId      String
+  role          String?
+
+  @@unique([committeeCode, personId])
+}
+
+model BillCommittee {
+  id            String @id @default(auto()) @map("_id") @db.ObjectId
+  billId        String
+  committeeCode String
+
+  @@unique([billId, committeeCode])
+}
+
+model BillAction {
+  id           String  @id @default(auto()) @map("_id") @db.ObjectId
+  billId       String
+  actionDate   String?
+  text         String?
+  type         String?
+  actionCode   String?
+  sourceSystem String?
+
+  @@unique([billId, actionDate, text, actionCode])
+  @@index([billId, actionDate(sort: Desc)])
+}
+
+model BillTextVersion {
+  id             String  @id @default(auto()) @map("_id") @db.ObjectId
+  billId         String
+  type           String?
+  date           String?
+  formatType     String?
+  url            String?
+  content        String?
+  contentFetched Int     @default(0)
+
+  @@unique([billId, type, formatType])
+}

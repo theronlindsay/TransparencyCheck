@@ -1,74 +1,89 @@
 import { env } from '$env/dynamic/private';
 import { execute } from '$lib/db.js';
-import { getMongoClient } from '$lib/db/mongo.js';
-
 const mongoMode = true; // Toggles database provider
 
 const CONGRESS_API_KEY = env.CONGRESS_API_KEY;
 
-async function addBillToMongo(billId, billStatus, detailedBill){
-	let mongo;
+import { prisma } from '$lib/db/prisma.js';
+
+async function addBillToMongo(billId, billStatus, detailedBill) {
 	try {
-		mongo = await getMongoClient();
-		const billCollection = mongo.db("AppData").collection("Bills");
-
-		const insertedResult = await billCollection.updateOne(
-			{_id: billId }, 
-			{$set: 
-				{
-					id: billId,
-					billNumber: detailedBill.number,
-					congress: detailedBill.congress,
-					type: detailedBill.type,
-					introducedDate: detailedBill.introducedDate,
-					latestAction: JSON.stringify(detailedBill.latestAction) || null,
-					status: billStatus,
-					originChamber: detailedBill.originChamber, 
-					originChamberCode: detailedBill.originChamberCode, 
-					title: detailedBill.title, 
-					updateDate: detailedBill.updateDate,
-					updateDateIncludingText: detailedBill.updateDateIncludingText, 
-					legislationUrl:  detailedBill.legislationUrl,
-					policyArea: JSON.stringify(detailedBill.policyArea) ||detailedBill.policyArea|| null, 
-					actionsCount: detailedBill.actionsCount, 
-					actionsUrl: detailedBill.actionsUrl, 
-					committees: detailedBill.committees, 
-					comitteesCount: detailedBill.comitteesCount,
-					comitteesUrl: detailedBill.comitteesUrl, 
-					cosponsorsCount: detailedBill.cosponsorsCount, 
-					cosponsorsUrl: detailedBill.cosponsorsUrl, 
-					relatedBillsCount: detailedBill.relatedBillsCount, 
-					relatedBillsUrl: detailedBill.relatedBillsUrl,
-					sponsors: JSON.stringify(detailedBill.sponsors) || detailedBill.sponsors,
-					subjectsCount: detailedBill.subjectsCount, 
-					subjectsUrl: detailedBill.subjectsUrl, 
-					summariesCount: detailedBill.summariesCount, 
-					summaraiesUrl: detailedBill.summaraiesUrl, 
-					textVersionsCount: detailedBill.textVersionsCount,
-					textVersionsUrl: detailedBill.textVersionsUrl, 
-					titlesCount: detailedBill.titlesCount, 
-					titlesUrl:  detailedBill.titlesUrl
-				}
+		const upsertedResult = await prisma.bill.upsert({
+			where: { id: billId },
+			update: {
+				billNumber: detailedBill.number,
+				congress: detailedBill.congress,
+				type: detailedBill.type,
+				introducedDate: detailedBill.introducedDate,
+				latestAction: JSON.stringify(detailedBill.latestAction) || null,
+				status: billStatus,
+				originChamber: detailedBill.originChamber,
+				originChamberCode: detailedBill.originChamberCode,
+				title: detailedBill.title,
+				updateDate: detailedBill.updateDate,
+				updateDateIncludingText: detailedBill.updateDateIncludingText,
+				legislationUrl: detailedBill.legislationUrl,
+				policyArea: JSON.stringify(detailedBill.policyArea) || detailedBill.policyArea || null,
+				actionsCount: detailedBill.actions?.count || detailedBill.actionsCount,
+				actionsUrl: detailedBill.actions?.url || detailedBill.actionsUrl,
+				committeesCount: detailedBill.committees?.count || detailedBill.comitteesCount, // Handle typo mapping from existing
+				committeesUrl: detailedBill.committees?.url || detailedBill.comitteesUrl,
+				cosponsorsCount: detailedBill.cosponsors?.count || detailedBill.cosponsorsCount,
+				cosponsorsUrl: detailedBill.cosponsors?.url || detailedBill.cosponsorsUrl,
+				relatedBillsCount: detailedBill.relatedBills?.count || detailedBill.relatedBillsCount,
+				relatedBillsUrl: detailedBill.relatedBills?.url || detailedBill.relatedBillsUrl,
+				sponsors: JSON.stringify(detailedBill.sponsors) || detailedBill.sponsors,
+				subjectsCount: detailedBill.subjects?.count || detailedBill.subjectsCount,
+				subjectsUrl: detailedBill.subjects?.url || detailedBill.subjectsUrl,
+				summariesCount: detailedBill.summaries?.count || detailedBill.summariesCount,
+				summaraiesUrl: detailedBill.summaries?.url || detailedBill.summaraiesUrl, // Typo preserved per schema mapping
+				textVersionsCount: detailedBill.textVersions?.count || detailedBill.textVersionsCount,
+				textVersionsUrl: detailedBill.textVersions?.url || detailedBill.textVersionsUrl,
+				titlesCount: detailedBill.titles?.count || detailedBill.titlesCount,
+				titlesUrl: detailedBill.titles?.url || detailedBill.titlesUrl
 			},
-			{ upsert: true}	
-		);
+			create: {
+				id: billId,
+				billNumber: detailedBill.number,
+				congress: detailedBill.congress,
+				type: detailedBill.type,
+				introducedDate: detailedBill.introducedDate,
+				latestAction: JSON.stringify(detailedBill.latestAction) || null,
+				status: billStatus,
+				originChamber: detailedBill.originChamber,
+				originChamberCode: detailedBill.originChamberCode,
+				title: detailedBill.title,
+				updateDate: detailedBill.updateDate,
+				updateDateIncludingText: detailedBill.updateDateIncludingText,
+				legislationUrl: detailedBill.legislationUrl,
+				policyArea: JSON.stringify(detailedBill.policyArea) || detailedBill.policyArea || null,
+				actionsCount: detailedBill.actions?.count || detailedBill.actionsCount,
+				actionsUrl: detailedBill.actions?.url || detailedBill.actionsUrl,
+				committeesCount: detailedBill.committees?.count || detailedBill.comitteesCount,
+				committeesUrl: detailedBill.committees?.url || detailedBill.comitteesUrl,
+				cosponsorsCount: detailedBill.cosponsors?.count || detailedBill.cosponsorsCount,
+				cosponsorsUrl: detailedBill.cosponsors?.url || detailedBill.cosponsorsUrl,
+				relatedBillsCount: detailedBill.relatedBills?.count || detailedBill.relatedBillsCount,
+				relatedBillsUrl: detailedBill.relatedBills?.url || detailedBill.relatedBillsUrl,
+				sponsors: JSON.stringify(detailedBill.sponsors) || detailedBill.sponsors,
+				subjectsCount: detailedBill.subjects?.count || detailedBill.subjectsCount,
+				subjectsUrl: detailedBill.subjects?.url || detailedBill.subjectsUrl,
+				summariesCount: detailedBill.summaries?.count || detailedBill.summariesCount,
+				summaraiesUrl: detailedBill.summaries?.url || detailedBill.summaraiesUrl,
+				textVersionsCount: detailedBill.textVersions?.count || detailedBill.textVersionsCount,
+				textVersionsUrl: detailedBill.textVersions?.url || detailedBill.textVersionsUrl,
+				titlesCount: detailedBill.titles?.count || detailedBill.titlesCount,
+				titlesUrl: detailedBill.titles?.url || detailedBill.titlesUrl
+			}
+		});
 
-		const upsertedId = insertedResult.upsertedId?._id;
-		console.log("Upserted document:", upsertedId ?? billId);
-
-
+		console.log('Upserted document:', upsertedResult.id ?? billId);
 	} catch (error) {
-    	console.error("❌ Error:", error.message);
-  	} finally {
-		if (mongo) {
-			await mongo.close();
-		}
-  	}
-
+		console.error('❌ Prisma Error:', error.message);
+	}
 }
 
-async function addBillToSQL(billId, billStatus, detailedBill){
-
+async function addBillToSQL(billId, billStatus, detailedBill) {
 	await execute(
 		`INSERT OR REPLACE INTO bills 
 		(id, billNumber, congress, type, introducedDate, latestAction, status, originChamber, originChamberCode, 
@@ -140,12 +155,7 @@ async function addBillToSQL(billId, billStatus, detailedBill){
 						`INSERT OR REPLACE INTO bill_people 
 						(billId, personId, relationship, isByRequest) 
 						VALUES (?, ?, ?, ?)`,
-						[
-							billId,
-							sponsor.bioguideId,
-							'sponsor',
-							sponsor.isByRequest || null
-						]
+						[billId, sponsor.bioguideId, 'sponsor', sponsor.isByRequest || null]
 					);
 				} catch (error) {
 					console.error(`Error saving sponsor ${sponsor.bioguideId}:`, error);
@@ -162,45 +172,50 @@ function determineBillStatus(bill) {
 	 * Converts the text to lowercase for case-insensitive comparison,
 	 * or defaults to an empty string if no action text is available.
 	 */
-	const latestActionText = bill.latestAction?.text?.toLowerCase() || ''; 
-	
-	if (latestActionText.includes('became public law') || 
-	    latestActionText.includes('became private law') ||
-	    latestActionText.includes('signed by president')) {
+	const latestActionText = bill.latestAction?.text?.toLowerCase() || '';
+
+	if (
+		latestActionText.includes('became public law') ||
+		latestActionText.includes('became private law') ||
+		latestActionText.includes('signed by president')
+	) {
 		return 'Enacted';
 	}
-	
-	if (latestActionText.includes('vetoed') || 
-	    latestActionText.includes('veto message')) {
+
+	if (latestActionText.includes('vetoed') || latestActionText.includes('veto message')) {
 		return 'Vetoed';
 	}
-	
-	if (latestActionText.includes('failed') || 
-	    latestActionText.includes('rejected') ||
-	    latestActionText.includes('motion to proceed rejected')) {
+
+	if (
+		latestActionText.includes('failed') ||
+		latestActionText.includes('rejected') ||
+		latestActionText.includes('motion to proceed rejected')
+	) {
 		return 'Failed';
 	}
-	
-	if (latestActionText.includes('passed senate') || 
-	    latestActionText.includes('received in the senate')) {
+
+	if (
+		latestActionText.includes('passed senate') ||
+		latestActionText.includes('received in the senate')
+	) {
 		return 'Passed House';
 	}
-	
-	if (latestActionText.includes('passed house') || 
-	    latestActionText.includes('received in the house')) {
+
+	if (
+		latestActionText.includes('passed house') ||
+		latestActionText.includes('received in the house')
+	) {
 		return 'Passed Senate';
 	}
-	
-	if (latestActionText.includes('referred to') || 
-	    latestActionText.includes('committee on')) {
+
+	if (latestActionText.includes('referred to') || latestActionText.includes('committee on')) {
 		return 'In Committee';
 	}
-	
-	if (latestActionText.includes('introduced in') || 
-	    bill.introducedDate) {
+
+	if (latestActionText.includes('introduced in') || bill.introducedDate) {
 		return 'Introduced';
 	}
-	
+
 	return 'Active';
 }
 
@@ -238,9 +253,8 @@ async function saveBillToDatabase(bill) {
 
 	const billStatus = determineBillStatus(detailedBill);
 
-
 	//TOGGLE SQL AND MONGO HERE
-	if(mongoMode){
+	if (mongoMode) {
 		await addBillToMongo(billId, billStatus, detailedBill);
 	} else {
 		await addBillToSQL(billId, billStatus, detailedBill);
@@ -250,7 +264,7 @@ async function saveBillToDatabase(bill) {
 }
 
 export async function fetchAndStoreBills({ searchQuery, dateFrom, dateTo, limit = 40 } = {}) {
-    if (!CONGRESS_API_KEY) {
+	if (!CONGRESS_API_KEY) {
 		throw new Error('CONGRESS_API_KEY is not defined');
 	}
 
@@ -272,9 +286,7 @@ export async function fetchAndStoreBills({ searchQuery, dateFrom, dateTo, limit 
 			apiParams.append('toDateTime', `${dateTo}T23:59:59Z`);
 		}
 
-		const response = await fetch(
-			`https://api.congress.gov/v3/bill?${apiParams.toString()}`
-		);
+		const response = await fetch(`https://api.congress.gov/v3/bill?${apiParams.toString()}`);
 
 		if (!response.ok) {
 			throw new Error(`Congress.gov API error: ${response.status} ${response.statusText}`);
@@ -293,9 +305,9 @@ export async function fetchAndStoreBills({ searchQuery, dateFrom, dateTo, limit 
 			}
 		}
 		console.log(`Finished processing ${bills.length} bills.`);
-        return bills;
+		return bills;
 	} catch (error) {
 		console.error('Failed to fetch and store bills:', error);
-        throw error;
+		throw error;
 	}
 }

@@ -35,6 +35,5 @@
 		"prettier-plugin-svelte": "^3.3.3"
 	},
 	"dependencies": {
-		"typeorm": "^0.3.28"
 	}
 }

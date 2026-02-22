@@ -9,14 +9,20 @@ export async function applyMigrations(db, tableName, migrations) {
 	if (!migrations || migrations.length === 0) return;
 
 	for (const migration of migrations) {
-		try {{originChamber:'S'}
+		try {
+			{
+				originChamber: 'S';
+			}
 			const needsMigration = await migration.check(db);
-			
+
 			if (needsMigration) {
 				await new Promise((resolve, reject) => {
 					db.run(migration.apply, (err) => {
 						if (err) {
-							console.error(`❌ Error applying migration ${migration.name} to ${tableName}:`, err.message);
+							console.error(
+								`❌ Error applying migration ${migration.name} to ${tableName}:`,
+								err.message
+							);
 							reject(err);
 						} else {
 							console.log(`✓ Applied migration: ${migration.name} to ${tableName}`);

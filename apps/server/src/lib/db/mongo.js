@@ -5,25 +5,23 @@ const url = `mongodb+srv://user:${env.MONGO_PASS}@cluster0.esbggou.mongodb.net/?
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(url, {
-  serverApi: {
-    version: ServerApiVersion.v1,
-    strict: true,
-    deprecationErrors: true,
-  }
+	serverApi: {
+		version: ServerApiVersion.v1,
+		strict: true,
+		deprecationErrors: true
+	}
 });
 
 export async function getMongoClient() {
-  await client.connect();
-  return client;
+	await client.connect();
+	return client;
 }
 
 //Export functions from other database script
-export { 
-	getBillById, 
-	getBillTextVersions, 
+export {
+	getBillById,
+	getBillTextVersions,
 	getBillActions,
 	saveBillActions,
 	fetchAndStoreTextVersions
-} from '../bills.js';
-
-
+} from './bills.js';

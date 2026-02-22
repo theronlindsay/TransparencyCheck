@@ -9,7 +9,7 @@ import { getDatabase } from './connection.js';
  */
 export async function query(sql, params = []) {
 	const db = await getDatabase();
-	
+
 	return new Promise((resolve, reject) => {
 		db.all(sql, params, (err, rows) => {
 			db.close();
@@ -30,7 +30,7 @@ export async function query(sql, params = []) {
  */
 export async function queryOne(sql, params = []) {
 	const db = await getDatabase();
-	
+
 	return new Promise((resolve, reject) => {
 		db.get(sql, params, (err, row) => {
 			db.close();
@@ -53,11 +53,11 @@ export async function execute(sql, params = []) {
 	console.log('=== EXECUTE SQL ===');
 	console.log('SQL:', sql);
 	console.log('Params:', params);
-	
+
 	const db = await getDatabase();
-	
+
 	return new Promise((resolve, reject) => {
-		db.run(sql, params, function(err) {
+		db.run(sql, params, function (err) {
 			if (err) {
 				console.error('✗ SQL execution error:', err.message);
 				console.error('Failed SQL:', sql);
@@ -69,7 +69,7 @@ export async function execute(sql, params = []) {
 				console.log('  Last ID:', this.lastID);
 				console.log('  Changes:', this.changes);
 				console.log('==================');
-				
+
 				db.close();
 				resolve({
 					lastID: this.lastID,
@@ -85,11 +85,11 @@ export async function execute(sql, params = []) {
  */
 export async function transaction(callback) {
 	const db = await getDatabase();
-	
+
 	return new Promise((resolve, reject) => {
 		db.serialize(() => {
 			db.run('BEGIN TRANSACTION');
-			
+
 			Promise.resolve(callback(db))
 				.then((result) => {
 					db.run('COMMIT', (err) => {
