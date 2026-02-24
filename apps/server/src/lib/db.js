@@ -1,22 +1,15 @@
 /**
- * Main database module - re-exports from db/index.js
- * This file exists for backward compatibility with existing imports
+ * Main database module — re-exports from the repository for backward compatibility.
+ * The repository handles MongoDB-first with automatic SQLite fallback.
  */
 
 export {
-	initDatabase,
-	getDatabase,
-	closeDatabase,
-	query,
-	queryOne,
-	execute,
-	transaction,
+	saveBill,
+	saveBillActions,
+	saveTextVersion,
 	getBillById,
 	getBillTextVersions,
 	getBillActions,
-	saveBillActions,
+	getRecentBills,
 	fetchAndStoreTextVersions
-} from './db/sql/index.js';
-
-// exporting from .db/sql/index.js will enable SQL
-// ./db/mongo.js will use mongo
+} from './db/repository.js';

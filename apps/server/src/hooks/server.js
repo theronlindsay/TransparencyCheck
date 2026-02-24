@@ -1,4 +1,3 @@
-import { initDatabase } from '$lib/db';
 import { fetchAndStoreBills } from '$lib/bill-fetcher.js';
 
 /**
@@ -22,11 +21,10 @@ async function fetchRecentBills() {
 	}
 }
 
-// Initialize the database first.
-await initDatabase();
+// Prisma manages both database schemas now — no manual initDatabase() needed.
+// SQLite tables are created via `npx prisma db push --schema=apps/server/prisma/schema.sqlite.prisma`
 
-// After DB is ready, fetch recent bills in the background.
-// We don't await this so it doesn't block server startup.
+// Fetch recent bills in the background (non-blocking).
 fetchRecentBills().catch((err) => {
 	console.error('Background bill fetch failed:', err);
 });

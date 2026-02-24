@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { prisma } from '$lib/db/prisma.js';
+import { getRecentBills } from '$lib/db/repository.js';
 import { fetchAndStoreBills } from '$lib/bill-fetcher.js';
 
 const corsHeaders = {
@@ -47,33 +47,10 @@ export async function GET() {
 			});
 		}
 
-		// Fetch bills from MongoDB via Prisma
-		const bills = await prisma.bill.findMany({
-			orderBy: { updateDate: 'desc' },
-			take: 100
-		});
+		// Repository handles Mongo-first with SQLite fallback
+		const bills = await getRecentBills(100);
 
-		// Parse JSON string fields for each bill
-		const parsedBills = bills.map((bill) => {
-			const safeParse = (str, fallback = null) => {
-				if (!str) return fallback;
-				try {
-					return JSON.parse(str);
-				} catch (e) {
-					return fallback;
-				}
-			};
-
-			return {
-				...bill,
-				latestAction: safeParse(bill.latestAction),
-				policyArea: safeParse(bill.policyArea),
-				sponsors: safeParse(bill.sponsors, []),
-				committees: []
-			};
-		});
-
-		return json(parsedBills, { headers: corsHeaders });
+		return json(bills, { headers: corsHeaders });
 	} catch (error) {
 		console.error('Error fetching bills:', error);
 		return json({ error: error.message }, { status: 500, headers: corsHeaders });
