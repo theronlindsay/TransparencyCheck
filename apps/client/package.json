@@ -25,6 +25,8 @@
 	"dependencies": {
 		"@capacitor/android": "^8.0.0",
 		"@capacitor/app": "^8.0.0",
-		"@capacitor/core": "^8.0.0"
+		"@capacitor/core": "^8.0.0",
+		"workbox-build": "^7.4.0",
+		"workbox-window": "^7.4.0"
 	}
 }

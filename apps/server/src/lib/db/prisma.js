@@ -1,8 +1,9 @@
 import { createRequire } from 'module';
+import { join } from 'path';
 import { env } from '$env/dynamic/private';
 
 const require = createRequire(import.meta.url);
-const { PrismaClient } = require('./generated/client/index.js');
+const { PrismaClient } = require(join(process.cwd(), 'src', 'lib', 'db', 'generated', 'client', 'index.js'));
 
 const globalForPrisma = globalThis;
 
