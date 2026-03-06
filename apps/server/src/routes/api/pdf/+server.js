@@ -3,16 +3,6 @@ import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
 
-const corsHeaders = {
-	'Access-Control-Allow-Origin': '*',
-	'Access-Control-Allow-Methods': 'GET, OPTIONS',
-	'Access-Control-Allow-Headers': 'Content-Type'
-};
-
-export async function OPTIONS() {
-	return new Response(null, { headers: corsHeaders });
-}
-
 // Directory to store downloaded PDFs
 const PDF_CACHE_DIR = path.join(process.cwd(), '.cache', 'pdfs');
 
@@ -42,7 +32,7 @@ export async function GET({ url }) {
 	const pdfUrl = url.searchParams.get('url');
 
 	if (!pdfUrl) {
-		return json({ error: 'URL parameter is required' }, { status: 400, headers: corsHeaders });
+		return json({ error: 'URL parameter is required' }, { status: 400 });
 	}
 
 	console.log('\n========================================');
@@ -90,7 +80,6 @@ export async function GET({ url }) {
 
 		return new Response(pdfBuffer, {
 			headers: {
-				...corsHeaders,
 				'Content-Type': 'application/pdf',
 				'Content-Disposition': 'inline; filename="bill.pdf"',
 				'Cache-Control': 'public, max-age=86400' // Cache for 24 hours
@@ -98,6 +87,6 @@ export async function GET({ url }) {
 		});
 	} catch (error) {
 		console.error('Error handling PDF:', error);
-		return json({ error: error.message }, { status: 500, headers: corsHeaders });
+		return json({ error: error.message }, { status: 500 });
 	}
 }
