@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { OpenAI } from 'openai'
+import { OpenAI } from 'openai';
 import { env } from '$env/dynamic/private';
 
 const OPENAI_API_KEY = env.OPENAI_API_KEY;
@@ -23,12 +23,12 @@ function validateRequest(prompt, requestData) {
 	if (readingLevelMatch) {
 		const allowedLevels = [
 			'elementary school reading level',
-			'middle school reading level', 
+			'middle school reading level',
 			'high school reading level',
 			'general adult audience',
 			'expertise in policy'
 		];
-		const hasValidLevel = allowedLevels.some(level => 
+		const hasValidLevel = allowedLevels.some((level) =>
 			readingLevelMatch[1].toLowerCase().includes(level)
 		);
 		if (!hasValidLevel) {
@@ -46,7 +46,7 @@ function validateRequest(prompt, requestData) {
 		/__proto__/i,
 		/constructor\[/i
 	];
-	
+
 	for (const pattern of suspiciousPatterns) {
 		if (pattern.test(prompt)) {
 			errors.push('Prompt contains potentially malicious content');
@@ -86,11 +86,18 @@ function validateRequest(prompt, requestData) {
 		const minLength = parseInt(summaryLengthMatch[1], 10);
 		const maxLength = parseInt(summaryLengthMatch[2], 10);
 
-		if (isNaN(minLength) || isNaN(maxLength) || minLength < 50 || maxLength > 500 || minLength >= maxLength) {
-			errors.push('Invalid summary length range. Must be between 50-500 characters, with min < max.');
+		if (
+			isNaN(minLength) ||
+			isNaN(maxLength) ||
+			minLength < 50 ||
+			maxLength > 500 ||
+			minLength >= maxLength
+		) {
+			errors.push(
+				'Invalid summary length range. Must be between 50-500 characters, with min < max.'
+			);
 		}
 	}
-
 
 	return {
 		isValid: errors.length === 0,
@@ -100,29 +107,35 @@ function validateRequest(prompt, requestData) {
 
 export async function POST({ request }) {
 	try {
-        //wait for the prompt, optional tools, and optional conversation ID
+		//wait for the prompt, optional tools, and optional conversation ID
 		const { prompt, tools, conversationId } = await request.json();
 
 		// Server-side validation
 		const validation = validateRequest(prompt, { tools });
 		if (!validation.isValid) {
 			console.error('Validation failed:', validation.errors);
-			return json({ 
-				error: validation.errors.join('; '),
-				validationErrors: validation.errors,
-				success: false 
-			}, { status: 400 });
+			return json(
+				{
+					error: validation.errors.join('; '),
+					validationErrors: validation.errors,
+					success: false
+				},
+				{ status: 400 }
+			);
 		}
 
 		// Call requestAI function and get the response
 		const result = await requestAI(prompt, tools, conversationId);
 
-		return json({ 
-			success: true, 
-			response: result.text, 
-			conversationId: result.conversationId,
-			prompt 
-		}, { headers: corsHeaders });
+		return json(
+			{
+				success: true,
+				response: result.text,
+				conversationId: result.conversationId,
+				prompt
+			},
+			{ headers: corsHeaders }
+		);
 	} catch (error) {
 		console.error('Error in openAI endpoint:', error);
 		return json({ error: error.message, success: false }, { status: 500, headers: corsHeaders });
@@ -130,9 +143,9 @@ export async function POST({ request }) {
 }
 
 async function requestAI(prompt, tools, conversationId = null) {
-    const client = new OpenAI({
-        apiKey: OPENAI_API_KEY
-    });
+	const client = new OpenAI({
+		apiKey: OPENAI_API_KEY
+	});
 
 	console.log('Prompt:', prompt);
 	if (tools) {
@@ -160,7 +173,7 @@ async function requestAI(prompt, tools, conversationId = null) {
 	const response = await client.responses.create(requestOptions);
 
 	console.log('OpenAI Response:', response);
-	
+
 	// Extract the text content and conversation ID from the Responses API output
 	const outputText = response.output_text || '';
 	return {
@@ -168,4 +181,3 @@ async function requestAI(prompt, tools, conversationId = null) {
 		conversationId: response.id
 	};
 }
-

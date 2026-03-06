@@ -29,18 +29,18 @@ async function ensureCacheDir() {
 // Include a shortened version of the URL for debugging
 function generateFileName(url) {
 	const hash = crypto.createHash('sha256').update(url).digest('hex');
-	
+
 	// Extract bill identifier from URL for better cache management
 	// URL format: https://www.congress.gov/119/bills/hr6495/BILLS-119hr6495ih.pdf
 	const billMatch = url.match(/\/bills\/(\w+)\/BILLS-/);
 	const billId = billMatch ? billMatch[1] : 'unknown';
-	
+
 	return `${billId}_${hash.substring(0, 16)}.pdf`;
 }
 
 export async function GET({ url }) {
 	const pdfUrl = url.searchParams.get('url');
-	
+
 	if (!pdfUrl) {
 		return json({ error: 'URL parameter is required' }, { status: 400, headers: corsHeaders });
 	}
@@ -50,16 +50,16 @@ export async function GET({ url }) {
 	console.log('========================================');
 	console.log('Requested PDF URL:', pdfUrl);
 	console.log('Full request URL:', url.href);
-	
+
 	try {
 		await ensureCacheDir();
-		
+
 		const fileName = generateFileName(pdfUrl);
 		const filePath = path.join(PDF_CACHE_DIR, fileName);
-		
+
 		console.log('Cache filename (hash):', fileName);
 		console.log('Cache file path:', filePath);
-		
+
 		// Check if PDF is already cached
 		let pdfBuffer;
 		try {
@@ -71,23 +71,23 @@ export async function GET({ url }) {
 			// File doesn't exist, download it
 			console.log('⬇️  PDF not cached, downloading from Congress.gov...');
 			const response = await fetch(pdfUrl);
-			
+
 			if (!response.ok) {
 				console.log('❌ Failed to fetch PDF:', response.status);
-				console.log(`Error: ${err}`)
+				console.log(`Error: ${err}`);
 				console.log('========================================\n');
 				throw new Error(`Failed to fetch PDF: ${response.status}`);
 			}
-			
+
 			pdfBuffer = await response.arrayBuffer();
-			
+
 			// Cache the PDF
 			await fs.writeFile(filePath, Buffer.from(pdfBuffer));
 			console.log('✅ Downloaded and cached PDF');
 			console.log('   File size:', pdfBuffer.byteLength, 'bytes');
 			console.log('========================================\n');
 		}
-		
+
 		return new Response(pdfBuffer, {
 			headers: {
 				...corsHeaders,

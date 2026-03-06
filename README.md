@@ -100,12 +100,12 @@ Build the client as an Android APK:
 
 ```bash
 cd apps/client
-npm run build:prod  # Build with production API URL
+VITE_API_BASE_URL=https://your-api-domain.com npm run build
 npx cap sync android
 npx cap open android  # Opens in Android Studio
 ```
 
-Configure the API URL in `apps/client/src/lib/config.js`.
+Set `VITE_API_BASE_URL` to your deployed API origin when building for Android.
 
 ## Project Structure
 
@@ -139,8 +139,8 @@ TransparencyCheck/
 │   ├── client/
 │   │   ├── dockerfile
 │   │   └── nginx.conf       # HTTPS + redirect config
-│   └── server/
-│       └── dockerfile
+│   ├── server/
+│   │   └── dockerfile
 ├── docker-compose           # Orchestrates client + server
 └── package.json             # Workspace root
 
@@ -178,6 +178,12 @@ npm run build            # Build both client and server
 npm run build:client     # Build client only
 npm run build:server     # Build server only
 
+# Android (Capacitor)
+cd apps/client
+VITE_API_BASE_URL=https://your-api-domain.com npm run build
+npx cap sync android
+npx cap open android
+
 # Code quality
 npm run lint             # Prettier + ESLint check
 npm run format           # Auto-format code
@@ -210,9 +216,12 @@ The client app can be built as an Android app using Capacitor:
 
 ```bash
 cd apps/client
+VITE_API_BASE_URL=https://your-api-domain.com npm run build
 npx cap sync android
 npx cap open android
 ```
+
+Use your deployed API origin for `VITE_API_BASE_URL` (for example, `https://api.example.com`).
 
 See [capacitor.config.json](capacitor.config.json) for mobile app configuration.
 
