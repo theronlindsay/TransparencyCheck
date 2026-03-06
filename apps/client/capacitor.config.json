@@ -1,5 +1,5 @@
 {
-  "appId": "com.chimeraware.transparencycheck",
+  "appId": "app.transparencycheck.app",
   "appName": "Transparency Check",
   "webDir": "build"
 }
