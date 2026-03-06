@@ -56,5 +56,12 @@ pdf_cache/
 
 #android builds
 android
+ios
+build
 
 ssl
+apps/server/src/lib/db/generated
+
+apps/server/db
+
+apps/server/prisma/apps/server/db
