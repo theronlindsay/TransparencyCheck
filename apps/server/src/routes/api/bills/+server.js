@@ -2,6 +2,12 @@ import { json } from '@sveltejs/kit';
 import { getRecentBills } from '$lib/db/repository.js';
 import { fetchAndStoreBills } from '$lib/bill-fetcher.js';
 
+const corsHeaders = {
+	'Access-Control-Allow-Origin': '*',
+	'Access-Control-Allow-Methods': 'GET, OPTIONS',
+	'Access-Control-Allow-Headers': 'Content-Type'
+};
+
 // Flag to ensure background job only runs once
 let backgroundJobStarted = false;
 
@@ -28,6 +34,10 @@ async function startBackgroundJob() {
 	}
 }
 
+export async function OPTIONS() {
+	return new Response(null, { headers: corsHeaders });
+}
+
 export async function GET() {
 	try {
 		// Start background job on first request (non-blocking)
@@ -40,10 +50,10 @@ export async function GET() {
 		// Repository handles Mongo-first with SQLite fallback
 		const bills = await getRecentBills(100);
 
-		return json(bills);
+		return json(bills, { headers: corsHeaders });
 	} catch (error) {
 		console.error('Error fetching bills:', error);
-		return json({ error: error.message }, { status: 500 });
+		return json({ error: error.message }, { status: 500, headers: corsHeaders });
 	}
 }
 

@@ -7,13 +7,6 @@
 
 // Set this via environment (e.g. VITE_API_BASE_URL=http://server:3000)
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
-
-// Log API configuration on startup for debugging (visible in browser console and Android Logcat)
-console.log('🌐 API Configuration Loaded');
-console.log('   VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL);
-console.log('   API_BASE_URL:', API_BASE_URL);
-console.log('   Empty base URL means relative paths (same origin)');
-
 /**
  * Get the base URL for API calls
  * Returns empty string for browser (relative paths), or VPS URL for Static Client
@@ -28,7 +21,5 @@ export function getApiBaseUrl() {
  * @returns {string} Full URL for the API endpoint
  */
 export function apiUrl(path) {
-	const fullUrl = `${getApiBaseUrl()}${path}`;
-	console.log(`🔗 API Request: ${fullUrl}`);
-	return fullUrl;
+	return `${getApiBaseUrl()}${path}`;
 }

@@ -9,13 +9,23 @@ import { env } from '$env/dynamic/private';
 
 const CONGRESS_API_KEY = env.CONGRESS_API_KEY;
 
+const corsHeaders = {
+	'Access-Control-Allow-Origin': '*',
+	'Access-Control-Allow-Methods': 'GET, OPTIONS',
+	'Access-Control-Allow-Headers': 'Content-Type'
+};
+
+export async function OPTIONS() {
+	return new Response(null, { headers: corsHeaders });
+}
+
 export async function GET({ params }) {
 	try {
 
 		const billData = await getBillById(params.id);
 
 		if (!billData) {
-			return json({ error: 'Bill not found' }, { status: 404 });
+			return json({ error: 'Bill not found' }, { status: 404, headers: corsHeaders });
 		}
 
 		// Get text versions and actions
@@ -58,14 +68,14 @@ export async function GET({ params }) {
 			news: []
 		};
 
-		return json({ bill, textVersions, actions });
+		return json({ bill, textVersions, actions }, { headers: corsHeaders });
 	} catch (error) {
 		console.error(`Error fetching bill ${params.id}:`, error);
 		// Log the full stack trace
 		if (error.stack) console.error(error.stack);
 		return json(
 			{ error: error.message, stack: error.stack },
-			{ status: 500 }
+			{ status: 500, headers: corsHeaders }
 		);
 	}
 }

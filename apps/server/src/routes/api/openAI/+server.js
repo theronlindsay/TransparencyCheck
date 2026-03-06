@@ -4,6 +4,16 @@ import { env } from '$env/dynamic/private';
 
 const OPENAI_API_KEY = env.OPENAI_API_KEY;
 
+const corsHeaders = {
+	'Access-Control-Allow-Origin': '*',
+	'Access-Control-Allow-Methods': 'POST, OPTIONS',
+	'Access-Control-Allow-Headers': 'Content-Type'
+};
+
+export async function OPTIONS() {
+	return new Response(null, { headers: corsHeaders });
+}
+
 // Server-side validation rules
 function validateRequest(prompt, requestData) {
 	const errors = [];
@@ -123,11 +133,12 @@ export async function POST({ request }) {
 				response: result.text,
 				conversationId: result.conversationId,
 				prompt
-			}
+			},
+			{ headers: corsHeaders }
 		);
 	} catch (error) {
 		console.error('Error in openAI endpoint:', error);
-		return json({ error: error.message, success: false }, { status: 500 });
+		return json({ error: error.message, success: false }, { status: 500, headers: corsHeaders });
 	}
 }
 
