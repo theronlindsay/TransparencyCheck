@@ -1,0 +1,5 @@
+icon.png (Should be at least 1024x1024px. Note: iOS requires no transparency for icons).
+splash.png (Should be at least 2732x2732px to fit the largest iPads).
+
+cd apps/client
+npx @capacitor/assets generate
