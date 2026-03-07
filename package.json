@@ -15,12 +15,12 @@
 		"install:all": "npm install && npm install --workspaces",
 		"format": "prettier --write .",
 		"lint": "prettier --check . && eslint .",
-		"docker:build": "podman-compose build",
-		"docker:up": "podman-compose up -d",
-		"docker:down": "podman-compose down",
-		"docker:logs": "podman-compose logs -f",
-		"docker:restart": "podman-compose restart",
-		"deploy": "npm run build && podman-compose up -d --build",
+		"docker:build": "podman compose build",
+		"docker:up": "podman compose up -d",
+		"docker:down": "podman compose down",
+		"docker:logs": "podman compose logs -f",
+		"docker:restart": "podman compose restart",
+		"deploy": "npm run build && podman compose up -d --build",
 		"deploy:docker": "npm run build && docker-compose up -d --build"
 	},
 	"workspaces": [

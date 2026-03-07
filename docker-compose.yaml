@@ -5,6 +5,7 @@ services:
       dockerfile: docker/server/dockerfile
     env_file:
       - .env
+      - apps/server/.env
     environment:
       - NODE_ENV=production
       - PORT=3000

@@ -9,7 +9,8 @@
 		itemsPerPage = $bindable(25),
 		searchCongress = $bindable(false),
 		resultsSummary = '',
-		onReset = () => {}
+		onReset = () => {},
+		onSearchCongress = () => {}
 	} = $props();
 
 	function handleReset() {
@@ -103,13 +104,15 @@
 			<input type="date" id="dateTo" bind:value={dateTo} />
 		</div>
 
-		<!-- Search Congress Checkbox -->
-		<div class="filter-group checkbox-group">
-			<label class="checkbox-label">
-				<input type="checkbox" bind:checked={searchCongress} />
-				<span>Search Congress.gov if needed</span>
-			</label>
-			<p class="checkbox-hint">Automatically search Congress.gov when local results are limited</p>
+		<!-- Search Congress Button -->
+		<div class="filter-group congress-search-group">
+			<button 
+				class="congress-search-button" 
+				onclick={onSearchCongress}
+			>
+				<span class="button-text">Search Congress.gov</span>
+			</button>
+			<p class="congress-hint">Search Congress.gov with current filters applied</p>
 		</div>
 	</div>
 
@@ -207,33 +210,45 @@
 		color: var(--text-tertiary);
 	}
 
-	.checkbox-group {
+	.congress-search-group {
 		grid-column: 1 / -1;
 		padding-top: 0.5rem;
 		border-top: 1px solid var(--border-color);
 	}
 
-	.checkbox-label {
+	.congress-search-button {
 		display: flex;
 		align-items: center;
+		justify-content: center;
 		gap: 0.75rem;
+		padding: 0.875rem 1.25rem;
+		background: var(--accent);
+		color: #fff;
+		border: 2px solid var(--accent);
+		border-radius: var(--radius-md);
 		cursor: pointer;
 		font-size: 1rem;
-		color: var(--text-primary);
+		font-weight: 600;
+		transition: all 0.2s;
+		width: 100%;
 	}
 
-	input[type='checkbox'] {
-		width: 18px;
-		height: 18px;
-		cursor: pointer;
-		accent-color: var(--accent);
+	.congress-search-button:hover {
+		background: #d63a37;
+		border-color: #d63a37;
+		transform: translateY(-1px);
+		box-shadow: 0 2px 8px rgba(241, 58, 55, 0.3);
 	}
 
-	.checkbox-label span {
-		font-weight: 500;
+	.congress-search-button:active {
+		transform: translateY(0);
 	}
 
-	.checkbox-hint {
+	.button-text {
+		font-weight: 600;
+	}
+
+	.congress-hint {
 		margin: 0.5rem 0 0 0;
 		font-size: 0.85rem;
 		color: var(--text-tertiary);

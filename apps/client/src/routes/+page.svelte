@@ -346,20 +346,10 @@
 						bind:searchCongress
 						resultsSummary="Showing {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, filteredBills().length)} of {filteredBills().length} bills"
 						onReset={handleFilterReset}
-					/>
-				</div>
+					onSearchCongress={searchOnServer}
+				/>
+			</div>
 
-				<!-- Congress Search Prompt -->
-				{#if shouldShowCongressPrompt && !searchCongress}
-					<div class="congress-prompt">
-						<p>
-							<strong>Limited results found ({filteredBills().length} bills)</strong>
-						</p>
-						<p>Enable "Search Congress.gov if needed" in filters to automatically search for more bills.</p>
-					</div>
-				{/if}
-
-				
 
 				<!-- Bills Grid -->
 				{#if isSearching && serverSearchResults.length === 0}
@@ -376,7 +366,6 @@
 							</button>
 						{:else}
 							<p>No bills match the current filters in the local database.</p>
-							<p class="empty-hint">Enable "Search Congress.gov if needed" in filters to automatically search when results are limited.</p>
 						{/if}
 					</div>
 				{:else}
@@ -543,35 +532,6 @@
 		max-height: 0;
 		margin-bottom: 0;
 		opacity: 0;
-	}
-
-	.congress-prompt {
-		padding: 1rem 1.5rem;
-		background: rgba(241, 58, 55, 0.1);
-		border: 1px solid rgba(241, 58, 55, 0.3);
-		border-radius: var(--radius-md);
-		margin-bottom: 1.5rem;
-	}
-
-	.congress-prompt p {
-		margin: 0.5rem 0;
-		color: var(--text-primary);
-		font-size: 0.95rem;
-	}
-
-	.congress-prompt p:first-child {
-		margin-top: 0;
-	}
-
-	.congress-prompt p:last-child {
-		margin-bottom: 0;
-		color: var(--text-secondary);
-	}
-
-	.empty-hint {
-		margin-top: 0.75rem;
-		font-size: 0.9rem;
-		color: var(--text-tertiary);
 	}
 
 	.bills-grid {

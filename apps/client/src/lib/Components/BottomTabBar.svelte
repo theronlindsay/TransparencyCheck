@@ -97,10 +97,12 @@
 		display: flex;
 		justify-content: space-around;
 		align-items: center;
-		height: 60px;
+		height: calc(68px + env(safe-area-inset-bottom));
 		background: var(--bg-primary);
 		border-top: 1px solid var(--border-color);
 		padding-bottom: env(safe-area-inset-bottom);
+		padding-top: 0.25rem;
+		box-sizing: border-box;
 		z-index: 100;
 		backdrop-filter: blur(20px);
 	}
@@ -118,6 +120,7 @@
 		cursor: pointer;
 		transition: color 0.2s ease, transform 0.2s ease;
 		flex: 1;
+		min-height: 56px;
 	}
 
 	.tab-item:hover {
@@ -140,5 +143,6 @@
 	.tab-item span {
 		font-size: 0.7rem;
 		font-weight: 500;
+		line-height: 1;
 	}
 </style>

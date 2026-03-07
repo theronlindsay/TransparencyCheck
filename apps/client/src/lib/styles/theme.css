@@ -38,6 +38,11 @@ body {
     letter-spacing: 0.015em;
 }
 
+/* Disable WebView tap highlight flash on touch interactions (Capacitor/Android) */
+* {
+    -webkit-tap-highlight-color: transparent;
+}
+
 /* Dark scrollbars */
 ::-webkit-scrollbar {
     width: 10px;

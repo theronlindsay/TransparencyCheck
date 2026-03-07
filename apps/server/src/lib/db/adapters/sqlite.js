@@ -74,7 +74,7 @@ export async function saveBill(billId, billStatus, bill) {
 						branch: 'legislative',
 						party: sponsor.party ?? null,
 						state: sponsor.state ?? null,
-						district: sponsor.district ?? null,
+						district: sponsor.district != null ? String(sponsor.district) : null,
 						url: sponsor.url ?? null
 					},
 					create: {
@@ -85,7 +85,7 @@ export async function saveBill(billId, billStatus, bill) {
 						branch: 'legislative',
 						party: sponsor.party ?? null,
 						state: sponsor.state ?? null,
-						district: sponsor.district ?? null,
+						district: sponsor.district != null ? String(sponsor.district) : null,
 						url: sponsor.url ?? null
 					}
 				});

@@ -15,6 +15,7 @@
 
 	let { children } = $props();
 	let isScrolled = $state(false);
+	let isCompactHeader = $derived($page.url.pathname !== '/' || isScrolled);
 
 	onMount(async () => {
 		if (pwaInfo) {
@@ -35,6 +36,7 @@
 		};
 
 		window.addEventListener('scroll', handleScroll);
+		handleScroll();
 
 		// Handle Capacitor hardware back button (only in Capacitor environment)
 		let backButtonListener = null;
@@ -74,7 +76,7 @@
 
 	
 
-	<div class="navbar-container" class:scrolled={isScrolled}>
+	<div class="navbar-container" class:scrolled={isCompactHeader}>
 		<div class="app-header">
 			<a href="/" class="logo-link">
 				<img src="/Logo.png" alt="Transparency Check"/>
@@ -151,7 +153,7 @@
 	.app-content {
 		flex: 1;
 		padding: 0;
-		padding-bottom: 70px; /* Space for bottom tab bar */
+		padding-bottom: calc(78px + env(safe-area-inset-bottom)); /* Space for bottom tab bar */
 	}
 
 	@media (max-width: 768px) {

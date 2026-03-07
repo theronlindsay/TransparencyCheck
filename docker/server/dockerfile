@@ -23,6 +23,9 @@ RUN if [ -f /app/package-lock.json ]; then \
 # Install all dependencies (workspace aware)
 RUN npm install
 
+# Fix for SvelteKit build step hitting SQLite without DB path existing
+RUN mkdir -p /app/db /app/apps/server/db
+
 COPY . .
 
 # Build server only
@@ -39,12 +42,19 @@ ENV NODE_ENV=production
 # Copy only server files needed at runtime
 COPY --from=build /app/package*.json ./
 COPY --from=build /app/apps/server/package*.json ./apps/server/
+COPY --from=build /app/apps/server/prisma ./apps/server/prisma
+COPY --from=build /app/apps/server/src/lib/db/generated ./src/lib/db/generated
+COPY --from=build /app/apps/server/src/lib/db/generated ./apps/server/src/lib/db/generated
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/apps/server/node_modules ./apps/server/node_modules
 COPY --from=build /app/apps/server/build ./apps/server/build
+
+# Copy startup script
+COPY docker/server/start.sh ./start.sh
+RUN chmod +x ./start.sh
 
 RUN mkdir -p /app/db /app/.cache
 
 EXPOSE 3000
 
-CMD ["node", "-r", "dotenv/config", "apps/server/build"]
+CMD ["./start.sh"]

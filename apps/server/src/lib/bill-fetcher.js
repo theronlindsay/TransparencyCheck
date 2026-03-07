@@ -79,10 +79,18 @@ async function saveBillToDatabase(bill) {
 	// repository handles Mongo-first, SQLite-fallback automatically
 	await saveBill(billId, billStatus, detailedBill);
 
-	return billId;
+	return detailedBill;
 }
 
 export async function fetchAndStoreBills({ searchQuery, dateFrom, dateTo, limit = 40 } = {}) {
+	const bills = [];
+	for await (const bill of fetchAndStoreBillsGenerator({ searchQuery, dateFrom, dateTo, limit })) {
+		bills.push(bill);
+	}
+	return bills;
+}
+
+export async function* fetchAndStoreBillsGenerator({ searchQuery, dateFrom, dateTo, limit = 40 } = {}) {
 	if (!CONGRESS_API_KEY) throw new Error('CONGRESS_API_KEY is not defined');
 
 	try {
@@ -107,14 +115,14 @@ export async function fetchAndStoreBills({ searchQuery, dateFrom, dateTo, limit 
 
 		for (const bill of bills) {
 			try {
-				await saveBillToDatabase(bill);
+				const detailedBill = await saveBillToDatabase(bill);
+				yield detailedBill;
 			} catch (err) {
 				console.error(`Error saving bill ${bill.type}${bill.number}:`, err);
 			}
 		}
 
 		console.log(`Finished processing ${bills.length} bills.`);
-		return bills;
 	} catch (err) {
 		console.error('Failed to fetch and store bills:', err);
 		throw err;

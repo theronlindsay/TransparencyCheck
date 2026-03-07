@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { fetchAndStoreBills } from '$lib/bill-fetcher.js';
+import { fetchAndStoreBills, fetchAndStoreBillsGenerator } from '$lib/bill-fetcher.js';
 
 // Helper function to determine bill status from API data
 // This is kept here for formatting the response, as the fetcher module only stores raw data.
@@ -62,9 +62,6 @@ export async function GET({ url }) {
 
 	try {
 
-		// Fetch bills from Congress.gov and ensure they are stored in the DB
-		const bills = await fetchAndStoreBills({ searchQuery, dateFrom, dateTo });
-
 		// If streaming is requested, return a streaming response
 		if (stream) {
 			const readable = new ReadableStream({
@@ -72,9 +69,9 @@ export async function GET({ url }) {
 					const encoder = new TextEncoder();
 					let count = 0;
 
-					console.log(`Starting stream for ${bills.length} bills`);
+					console.log(`Starting stream for bills`);
 
-					for (const bill of bills) {
+					for await (const bill of fetchAndStoreBillsGenerator({ searchQuery, dateFrom, dateTo })) {
 						try {
 							const billStatus = determineBillStatus(bill);
 
@@ -139,6 +136,7 @@ export async function GET({ url }) {
 		}
 
 		// Non-streaming response
+		const bills = await fetchAndStoreBills({ searchQuery, dateFrom, dateTo });
 		const formattedBills = bills.map((bill) => {
 			const billStatus = determineBillStatus(bill);
 			return {
