@@ -22,19 +22,21 @@ export async function GET({ params }) {
 		let textVersions = await getBillTextVersions(params.id);
 
 		// If no text versions in database and we have a textVersionsUrl, fetch them
+		// in the background (non-blocking) so the page loads immediately.
+		// Text versions will be available on the next page load.
 		if (textVersions.length === 0 && billData.textVersionsUrl && CONGRESS_API_KEY) {
-			console.log(`📥 Fetching text versions for ${params.id} from Congress.gov`);
-			try {
-				textVersions = await fetchAndStoreTextVersions(
-					params.id,
-					billData.textVersionsUrl,
-					CONGRESS_API_KEY
-				);
-				console.log(`✅ Fetched and stored ${textVersions.length} text versions`);
-			} catch (err) {
-				console.error('Error fetching text versions:', err);
-				// Continue even if text versions fail
-			}
+			console.log(`📥 Queuing background fetch of text versions for ${params.id}`);
+			fetchAndStoreTextVersions(
+				params.id,
+				billData.textVersionsUrl,
+				CONGRESS_API_KEY
+			)
+				.then((versions) => {
+					console.log(`✅ Background: stored ${versions.length} text versions for ${params.id}`);
+				})
+				.catch((err) => {
+					console.error('Background text version fetch failed:', err);
+				});
 		}
 
 		const actions = await getBillActions(params.id);

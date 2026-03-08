@@ -28,6 +28,9 @@ RUN mkdir -p /app/db /app/apps/server/db
 
 COPY . .
 
+# Rebuild native modules for Docker's Node version (local copy may be compiled for a different version)
+RUN npm rebuild better-sqlite3
+
 # Build server only
 RUN npm run build:server
 
