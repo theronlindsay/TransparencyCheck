@@ -107,6 +107,22 @@ npx cap open android  # Opens in Android Studio
 
 Set `VITE_API_BASE_URL` to your deployed API origin when building for Android.
 
+### Automated Android Release (GitHub Actions)
+
+The repository is configured with a GitHub Action (`android-build.yml`) that automatically builds the Android APK and creates a GitHub Release containing the APK file.
+
+To trigger an automated build and release, create and push a git tag starting with `v` (e.g., `v1.0.0`):
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+Alternatively, you can trigger it manually:
+1. Go to your repository's **Actions** tab on GitHub.
+2. Select the **Android Build & Release** workflow on the left.
+3. Click the **Run workflow** button.
+
 ## Project Structure
 
 ```

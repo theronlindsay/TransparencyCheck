@@ -36,7 +36,7 @@ jobs:
         run: npm ci
 
       - name: Build Web Assets
-        run: npm run build:static
+        run: npm run build:client
 
       - name: Sync Capacitor
         run: npx cap sync android
