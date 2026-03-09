@@ -7,6 +7,8 @@ export default defineConfig({
 		sveltekit(),
 		VitePWA({
 			registerType: 'autoUpdate',
+			scope: '/',
+			base: '/',
 			workbox: {
 				runtimeCaching: [
 					{
