@@ -38,6 +38,9 @@ jobs:
       - name: Install Client Dependencies
         run: npm install --workspace=apps/client
 
+      - name: Generate Android Build Target
+        run: npx cap add android
+
       - name: Build Web Assets
         run: npm run build:client
 
