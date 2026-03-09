@@ -56,11 +56,13 @@ function buildBillData(billId, billStatus, bill) {
 
 export async function saveBill(billId, billStatus, bill) {
 	const data = buildBillData(billId, billStatus, bill);
-	await prisma.bill.upsert({
-		where: { id: billId },
-		update: data,
-		create: { id: billId, ...data }
-	});
+	const existing = await prisma.bill.findUnique({ where: { id: billId } });
+
+	if (existing) {
+		await prisma.bill.update({ where: { id: billId }, data });
+	} else {
+		await prisma.bill.create({ data: { id: billId, ...data } });
+	}
 }
 
 export async function saveBillActions(billId, actions) {

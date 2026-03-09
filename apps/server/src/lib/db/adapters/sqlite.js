@@ -54,63 +54,58 @@ export async function saveBill(billId, billStatus, bill) {
 		titlesUrl: bill.titles?.url ?? bill.titlesUrl ?? null
 	};
 
-	await prisma.bill.upsert({
-		where: {
-			billNumber_congress: {
-				billNumber: data.billNumber,
-				congress: data.congress
-			}
-		},
-		update: { id: billId, ...data },
-		create: { id: billId, ...data }
+	const existingBill = await prisma.bill.findFirst({
+		where: { billNumber: data.billNumber, congress: data.congress }
 	});
+
+	if (existingBill) {
+		await prisma.bill.update({ where: { id: existingBill.id }, data: { id: billId, ...data } });
+	} else {
+		await prisma.bill.create({ data: { id: billId, ...data } });
+	}
 
 	// Also upsert sponsors into people + bill_people junction
 	if (bill.sponsors && Array.isArray(bill.sponsors)) {
 		for (const sponsor of bill.sponsors) {
 			if (!sponsor.bioguideId) continue;
 			try {
-				await prisma.person.upsert({
-					where: { bioguideId: sponsor.bioguideId },
-					update: {
-						firstName: sponsor.firstName ?? null,
-						lastName: sponsor.lastName ?? null,
-						fullName: sponsor.fullName ?? null,
-						branch: 'legislative',
-						party: sponsor.party ?? null,
-						state: sponsor.state ?? null,
-						district: sponsor.district != null ? String(sponsor.district) : null,
-						url: sponsor.url ?? null
-					},
-					create: {
-						bioguideId: sponsor.bioguideId,
-						firstName: sponsor.firstName ?? null,
-						lastName: sponsor.lastName ?? null,
-						fullName: sponsor.fullName ?? null,
-						branch: 'legislative',
-						party: sponsor.party ?? null,
-						state: sponsor.state ?? null,
-						district: sponsor.district != null ? String(sponsor.district) : null,
-						url: sponsor.url ?? null
-					}
+				const sponsorData = {
+					firstName: sponsor.firstName ?? null,
+					lastName: sponsor.lastName ?? null,
+					fullName: sponsor.fullName ?? null,
+					branch: 'legislative',
+					party: sponsor.party ?? null,
+					state: sponsor.state ?? null,
+					district: sponsor.district != null ? String(sponsor.district) : null,
+					url: sponsor.url ?? null
+				};
+				const existingPerson = await prisma.person.findUnique({
+					where: { bioguideId: sponsor.bioguideId }
 				});
+				if (existingPerson) {
+					await prisma.person.update({ where: { bioguideId: sponsor.bioguideId }, data: sponsorData });
+				} else {
+					await prisma.person.create({ data: { bioguideId: sponsor.bioguideId, ...sponsorData } });
+				}
 
-				await prisma.billPerson.upsert({
-					where: {
-						billId_personId_relationship: {
-							billId: billId,
-							personId: sponsor.bioguideId,
-							relationship: 'sponsor'
-						}
-					},
-					update: { isByRequest: sponsor.isByRequest ?? null },
-					create: {
-						billId: billId,
-						personId: sponsor.bioguideId,
-						relationship: 'sponsor',
-						isByRequest: sponsor.isByRequest ?? null
-					}
+				const existingBillPerson = await prisma.billPerson.findFirst({
+					where: { billId, personId: sponsor.bioguideId, relationship: 'sponsor' }
 				});
+				if (existingBillPerson) {
+					await prisma.billPerson.update({
+						where: { id: existingBillPerson.id },
+						data: { isByRequest: sponsor.isByRequest ?? null }
+					});
+				} else {
+					await prisma.billPerson.create({
+						data: {
+							billId,
+							personId: sponsor.bioguideId,
+							relationship: 'sponsor',
+							isByRequest: sponsor.isByRequest ?? null
+						}
+					});
+				}
 			} catch (err) {
 				console.error(`SQLite Prisma: error saving sponsor ${sponsor.bioguideId}:`, err.message);
 			}
@@ -136,30 +131,36 @@ export async function saveBillActions(billId, actions) {
 }
 
 export async function saveTextVersion(billId, version, format, content, isFetched) {
-	await prisma.billTextVersion.upsert({
-		where: {
-			billId_type_formatType: {
-				billId,
-				type: version.type ?? '',
-				formatType: format.type ?? ''
-			}
-		},
-		update: {
-			date: version.date ?? null,
-			url: format.url ?? null,
-			content,
-			contentFetched: isFetched
-		},
-		create: {
-			billId,
-			type: version.type ?? '',
-			date: version.date ?? null,
-			formatType: format.type ?? '',
-			url: format.url ?? null,
-			content,
-			contentFetched: isFetched
-		}
+	const versionType = version.type ?? '';
+	const formatType = format.type ?? '';
+
+	const existingVersion = await prisma.billTextVersion.findFirst({
+		where: { billId, type: versionType, formatType }
 	});
+
+	if (existingVersion) {
+		await prisma.billTextVersion.update({
+			where: { id: existingVersion.id },
+			data: {
+				date: version.date ?? null,
+				url: format.url ?? null,
+				content,
+				contentFetched: isFetched
+			}
+		});
+	} else {
+		await prisma.billTextVersion.create({
+			data: {
+				billId,
+				type: versionType,
+				date: version.date ?? null,
+				formatType,
+				url: format.url ?? null,
+				content,
+				contentFetched: isFetched
+			}
+		});
+	}
 }
 
 // ─── Reads ───────────────────────────────────────────────────────────────────
