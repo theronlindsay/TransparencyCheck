@@ -9,6 +9,8 @@ rm -rf /app/apps/server/db
 ln -sf /app/db /app/apps/server/db
 npx prisma@6.19.2 db push --schema=prisma/schema.sqlite.prisma --accept-data-loss --skip-generate
 
+npm install
+
 # Enable WAL mode so background writes don't block reads
 echo "Enabling SQLite WAL mode..."
 node -e "const Database = require('better-sqlite3'); const db = new Database('/app/db/transparency.sqlite'); db.pragma('journal_mode = WAL'); db.close(); console.log('✅ WAL mode enabled');" || echo "⚠️  Could not enable WAL mode"

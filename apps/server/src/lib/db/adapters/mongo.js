@@ -81,30 +81,38 @@ export async function saveBillActions(billId, actions) {
 }
 
 export async function saveTextVersion(billId, version, format, content, isFetched) {
-	await prisma.billTextVersion.upsert({
-		where: {
-			billId_type_formatType: {
-				billId,
-				type: version.type ?? '',
-				formatType: format.type ?? ''
-			}
-		},
-		update: {
-			date: version.date ?? null,
-			url: format.url ?? null,
-			content,
-			contentFetched: isFetched
-		},
-		create: {
-			billId,
-			type: version.type ?? '',
-			date: version.date ?? null,
-			formatType: format.type ?? '',
-			url: format.url ?? null,
-			content,
-			contentFetched: isFetched
-		}
+	// Avoid Prisma MongoDB compound unique index issues with nullable fields by
+	// using an explicit findFirst + update/create instead of upsert.
+	const versionType = version.type ?? '';
+	const formatType = format.type ?? '';
+
+	const existing = await prisma.billTextVersion.findFirst({
+		where: { billId, type: versionType, formatType }
 	});
+
+	if (existing) {
+		await prisma.billTextVersion.update({
+			where: { id: existing.id },
+			data: {
+				date: version.date ?? null,
+				url: format.url ?? null,
+				content,
+				contentFetched: isFetched
+			}
+		});
+	} else {
+		await prisma.billTextVersion.create({
+			data: {
+				billId,
+				type: versionType,
+				date: version.date ?? null,
+				formatType,
+				url: format.url ?? null,
+				content,
+				contentFetched: isFetched
+			}
+		});
+	}
 }
 
 // ─── Reads ───────────────────────────────────────────────────────────────────

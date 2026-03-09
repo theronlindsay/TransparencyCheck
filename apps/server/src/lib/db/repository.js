@@ -103,14 +103,14 @@ export async function saveTextVersion(billId, version, format, content, isFetche
 		await mongo.saveTextVersion(billId, version, format, content, isFetched);
 		mongoOk = true;
 	} catch (err) {
-		console.warn(`⚠️  MongoDB saveTextVersion failed for ${billId}:`, err.message);
+		console.warn(`⚠️  MongoDB saveTextVersion failed for ${billId}:`, err);
 	}
 
 	try {
 		await sqlite.saveTextVersion(billId, version, format, content, isFetched);
 	} catch (err) {
 		if (!mongoOk) throw err;
-		console.warn(`⚠️  SQLite saveTextVersion failed for ${billId} (Mongo succeeded):`, err.message);
+		console.warn(`⚠️  SQLite saveTextVersion failed for ${billId} (Mongo succeeded):`, err);
 	}
 }
 
@@ -198,6 +198,6 @@ export async function fetchAndStoreTextVersions(billId, textVersionsUrl, apiKey)
 		return await getBillTextVersions(billId);
 	} catch (err) {
 		console.error(`Error fetching text versions for ${billId}:`, err);
-		return [];
+		throw err; // Re-throw so callers know the operation failed
 	}
 }

@@ -55,8 +55,13 @@ export async function saveBill(billId, billStatus, bill) {
 	};
 
 	await prisma.bill.upsert({
-		where: { id: billId },
-		update: data,
+		where: {
+			billNumber_congress: {
+				billNumber: data.billNumber,
+				congress: data.congress
+			}
+		},
+		update: { id: billId, ...data },
 		create: { id: billId, ...data }
 	});
 
