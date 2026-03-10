@@ -17,7 +17,6 @@ build
 .github
 
 # Environment & secrets
-.env*
 *.pem
 ssl
 
@@ -28,7 +27,6 @@ ssl
 
 # Docker files themselves (not needed in build context)
 docker-compose.yaml
-docker
 
 # Caches & generated files
 .cache
