@@ -282,7 +282,6 @@
 	<div class="hero-section">
 		<h2>Welcome to Transparency Check</h2>
 		<p>Track and monitor congressional bills and legislative transparency.</p>
-		<p>If you are seeing this, that means auto-deploy works!</p>
 	</div>
 
 	<section class="recent-bills-section">
