@@ -1,0 +1,57 @@
+# Dependencies (reinstalled during build)
+node_modules
+**/node_modules
+
+# Build outputs
+build
+**/build
+.svelte-kit
+**/.svelte-kit
+*.tsbuildinfo
+
+# Git
+.git
+.gitignore
+
+# CI/CD
+.github
+
+# Environment & secrets
+.env*
+*.pem
+ssl
+
+# Dev/IDE
+.vscode
+.idea
+.DS_Store
+
+# Docker files themselves (not needed in build context)
+docker-compose.yaml
+docker
+
+# Caches & generated files
+.cache
+**/.cache
+pdf_cache
+apps/server/src/lib/db/generated
+
+# Databases (mounted as volumes at runtime)
+db
+apps/server/db
+apps/server/prisma/apps/server/db
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Mobile builds
+android
+ios
+
+# Misc
+README.md
+sslSetup
+coverage
