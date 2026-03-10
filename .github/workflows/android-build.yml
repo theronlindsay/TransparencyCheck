@@ -47,6 +47,10 @@ jobs:
         run: npx cap sync android
         working-directory: apps/client
 
+      - name: Create Icons
+        run: npx @capacitor/assets generate
+        working-directory: apps/client
+
       - name: Build Android APK (Debug)
         working-directory: apps/client/android
         run: |
