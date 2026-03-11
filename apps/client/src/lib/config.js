@@ -5,8 +5,8 @@
  * When running in browser on the VPS, API calls use relative paths.
  */
 
-// Set this via environment (e.g. VITE_API_BASE_URL=http://server:3000)
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://transparencycheck.app';
+const envBase = import.meta.env.VITE_API_BASE_URL;
+const API_BASE_URL = typeof envBase !== 'undefined' ? envBase : 'https://transparencycheck.app';
 
 // Log API configuration on startup for debugging (visible in browser console and Android Logcat)
 console.log('🌐 API Configuration Loaded');

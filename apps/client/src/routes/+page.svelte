@@ -127,17 +127,18 @@
 			// Sponsor filter
 			if (sponsorFilter) {
 				const sponsorQuery = sponsorFilter.toLowerCase();
-				const sponsors = bill.sponsors || '';
-				if (!sponsors.toLowerCase().includes(sponsorQuery)) {
+				const sponsorsArray = Array.isArray(bill.sponsors) ? bill.sponsors : [];
+				const sponsorStr = sponsorsArray.map(s => s ? `${s.firstName || ''} ${s.lastName || ''} ${s.fullName || ''}` : '').join(' ').toLowerCase();
+				if (!sponsorStr.includes(sponsorQuery)) {
 					return false;
 				}
 			}
 
 			// Date range filter
-			if (dateFrom && bill.introducedDate < dateFrom) {
+			if (dateFrom && bill.updateDate < dateFrom) {
 				return false;
 			}
-			if (dateTo && bill.introducedDate > dateTo) {
+			if (dateTo && bill.updateDate > dateTo) {
 				return false;
 			}
 
@@ -148,6 +149,7 @@
 	// Paginated bills
 	let paginatedBills = $derived(() => {
 		const filtered = filteredBills();
+		if (!filtered) return [];
 		const startIndex = (currentPage - 1) * itemsPerPage;
 		const endIndex = startIndex + itemsPerPage;
 		return filtered.slice(startIndex, endIndex);
@@ -158,7 +160,7 @@
 	// Check if we should show Congress search prompt
 	$effect(() => {
 		const filtered = filteredBills();
-		if (filtered.length < 10 && filtered.length > 0 && !isSearching && !hasSearched && !serverSearchResults.length) {
+		if (filtered && filtered.length < 10 && filtered.length > 0 && !isSearching && !hasSearched && !serverSearchResults.length) {
 			shouldShowCongressPrompt = true;
 		} else {
 			shouldShowCongressPrompt = false;
@@ -168,7 +170,7 @@
 	// Auto-search Congress if checkbox is enabled and results are low
 	$effect(() => {
 		const filtered = filteredBills();
-		if (searchCongress && filtered.length < 10 && !isSearching && !hasSearched && !serverSearchResults.length) {
+		if (searchCongress && filtered && filtered.length < 10 && !isSearching && !hasSearched && !serverSearchResults.length) {
 			searchOnServer();
 		}
 	});
@@ -370,16 +372,7 @@
 				{:else}
 					<div class="bills-grid">
 						{#each paginatedBills() as bill}
-							<Bill
-								id={bill.id}
-								number={bill.billNumber || bill.number}
-								title={bill.title}
-								sponsors={bill.sponsors}
-								committee={bill.primaryCommitteeName || 'Unassigned'}
-								statusTag={bill.status || bill.statusTag}
-								latestAction={bill.latestAction}
-								updatedAt={bill.updateDate}
-							/>
+							<Bill {bill} />
 						{/each}
 					</div>
 					

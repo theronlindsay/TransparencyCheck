@@ -1,17 +1,27 @@
 services:
+  mongodb:
+    image: mongo:latest
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD}
+    ports:
+      - "127.0.0.1:27017:27017" # Bound strictly to localhost to prevent external access
+    volumes:
+      - mongodb_data:/data/db # Persists your database so data isn't lost on restart
+
   server:
     build:
       context: .
       dockerfile: docker/server/dockerfile
+    depends_on:
+      - mongodb # Ensures the MongoDB container creates and mounts before Node boots
     env_file:
       - .env
-      - apps/server/.env
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - DB_PATH=/app/db/transparency.sqlite
+      - DATABASE_URL=mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongodb:27017/transparency_check?authSource=admin
     volumes:
-      - db-data:/app/db
       - pdf-cache:/app/.cache
     ports:
       - "3000:3000"
@@ -29,5 +39,5 @@ services:
       # - "8443:443"
 
 volumes:
-  db-data:
   pdf-cache:
+  mongodb_data:

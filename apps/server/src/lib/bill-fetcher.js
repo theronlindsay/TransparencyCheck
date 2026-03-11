@@ -1,7 +1,6 @@
-import { env } from '$env/dynamic/private';
 import { saveBill } from '$lib/db/repository.js';
 
-const CONGRESS_API_KEY = env.CONGRESS_API_KEY;
+const CONGRESS_API_KEY = process.env.CONGRESS_API_KEY;
 
 // ─── Status detection ────────────────────────────────────────────────────────
 
@@ -50,12 +49,14 @@ function determineBillStatus(bill) {
 async function getBillDetails(billUrl) {
 	if (!CONGRESS_API_KEY) throw new Error('CONGRESS_API_KEY is not defined');
 	const url = `${billUrl}?format=json&api_key=${CONGRESS_API_KEY}`;
+	console.log(`  🔍 Fetching bill details: ${url}`);
 	const response = await fetch(url);
 	if (!response.ok) {
-		console.error(`Failed to fetch bill details from ${url}. Status: ${response.status}`);
+		console.error(`  ❌ Failed to fetch bill details. Status: ${response.status}`);
 		return null;
 	}
 	const data = await response.json();
+	console.log(`  ✅ Got details for bill: ${data.bill?.type}${data.bill?.number}`);
 	return data.bill;
 }
 
@@ -63,6 +64,7 @@ async function getBillDetails(billUrl) {
 
 async function saveBillToDatabase(bill) {
 	const billId = `${bill.type}${bill.number}`;
+	console.log(`\n📝 Processing bill: ${billId}`);
 
 	let detailedBill = bill;
 	if (bill.url) {
@@ -70,28 +72,51 @@ async function saveBillToDatabase(bill) {
 			const details = await getBillDetails(bill.url);
 			if (details) detailedBill = details;
 		} catch (err) {
-			console.error(`Error fetching details for ${bill.number}:`, err);
+			console.error(`  ❌ Error fetching details for ${billId}:`, err.message);
+		}
+	} else {
+		console.log(`  ⚠️  No URL for bill ${billId}, using summary data only`);
+	}
+
+	// Fetch primary committee name if available
+	const committeesUrl = detailedBill.committees?.url || detailedBill.committeesUrl;
+	if (committeesUrl && CONGRESS_API_KEY) {
+		try {
+			const commUrl = `${committeesUrl}&api_key=${CONGRESS_API_KEY}`;
+			const commRes = await fetch(commUrl);
+			if (commRes.ok) {
+				const commData = await commRes.json();
+				if (commData.committees && commData.committees.length > 0) {
+					detailedBill.primaryCommitteeName = commData.committees[0].name;
+				}
+			}
+		} catch (err) {
+			console.error(`  ❌ Error fetching committees for ${billId}:`, err.message);
 		}
 	}
 
 	const billStatus = determineBillStatus(detailedBill);
+	console.log(`  📊 Status: ${billStatus}`);
 
-	// repository handles Mongo-first, SQLite-fallback automatically
 	await saveBill(billId, billStatus, detailedBill);
 
 	return detailedBill;
 }
 
-export async function fetchAndStoreBills({ searchQuery, dateFrom, dateTo, limit = 40 } = {}) {
+export async function fetchAndStoreBills({ searchQuery, congress, dateFrom, dateTo, limit = 40 } = {}) {
 	const bills = [];
-	for await (const bill of fetchAndStoreBillsGenerator({ searchQuery, dateFrom, dateTo, limit })) {
+	for await (const bill of fetchAndStoreBillsGenerator({ searchQuery, congress, dateFrom, dateTo, limit })) {
 		bills.push(bill);
 	}
 	return bills;
 }
 
-export async function* fetchAndStoreBillsGenerator({ searchQuery, dateFrom, dateTo, limit = 40 } = {}) {
-	if (!CONGRESS_API_KEY) throw new Error('CONGRESS_API_KEY is not defined');
+export async function* fetchAndStoreBillsGenerator({ searchQuery, congress, dateFrom, dateTo, limit = 40 } = {}) {
+	if (!CONGRESS_API_KEY) {
+		console.error('❌ CONGRESS_API_KEY is not set in environment');
+		throw new Error('CONGRESS_API_KEY is not defined');
+	}
+	console.log(`\n🚀 Starting bill fetch (congress: ${congress ?? 'all'}, limit: ${limit}${searchQuery ? `, query: "${searchQuery}"` : ''})`);
 
 	try {
 		const apiParams = new URLSearchParams({
@@ -104,8 +129,15 @@ export async function* fetchAndStoreBillsGenerator({ searchQuery, dateFrom, date
 		if (dateFrom) apiParams.append('fromDateTime', `${dateFrom}T00:00:00Z`);
 		if (dateTo) apiParams.append('toDateTime', `${dateTo}T23:59:59Z`);
 
-		const response = await fetch(`https://api.congress.gov/v3/bill?${apiParams.toString()}`);
-		if (!response.ok) 
+		// Use congress-specific endpoint if provided to avoid old bills surfacing via updateDate
+		const baseUrl = congress
+			? `https://api.congress.gov/v3/bill/${congress}`
+			: `https://api.congress.gov/v3/bill`;
+
+		console.log(`   URL: ${baseUrl}?${apiParams.toString()}`);
+
+		const response = await fetch(`${baseUrl}?${apiParams.toString()}`);
+		if (!response.ok)
 			throw new Error(`Congress.gov API error: ${response.status} ${response.statusText}`);
 
 		const data = await response.json();

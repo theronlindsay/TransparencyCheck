@@ -1,29 +1,16 @@
-/**
- * MongoDB adapter — all bill operations via Prisma.
- * Functions must match the interface in adapters/sqlite.js exactly.
- */
+import Bill from '$lib/db/models/Bill.js';
+import BillAction from '$lib/db/models/BillAction.js';
+import BillTextVersion from '$lib/db/models/BillTextVersion.js';
 
-import { prisma } from '$lib/db/prisma.js';
+// ─── Writes ─────────────────────────────────────────────────────────────────
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-const safeParse = (str, fallback = null) => {
-	if (!str) return fallback;
-	try {
-		return JSON.parse(str);
-	} catch {
-		return fallback;
-	}
-};
-
-/** Build the data payload shared between upsert create/update */
-function buildBillData(billId, billStatus, bill) {
-	return {
+export async function saveBill(billId, billStatus, bill) {
+	const data = {
 		billNumber: bill.number ?? bill.billNumber,
 		congress: bill.congress,
 		type: bill.type ?? null,
 		introducedDate: bill.introducedDate ?? null,
-		latestAction: JSON.stringify(bill.latestAction) ?? null,
+		latestAction: bill.latestAction ?? null,
 		status: billStatus,
 		originChamber: bill.originChamber ?? null,
 		originChamberCode: bill.originChamberCode ?? null,
@@ -31,7 +18,7 @@ function buildBillData(billId, billStatus, bill) {
 		updateDate: bill.updateDate ?? null,
 		updateDateIncludingText: bill.updateDateIncludingText ?? null,
 		legislationUrl: bill.legislationUrl ?? null,
-		policyArea: bill.policyArea ? JSON.stringify(bill.policyArea) : null,
+		policyArea: bill.policyArea ?? null,
 		actionsCount: bill.actions?.count ?? bill.actionsCount ?? null,
 		actionsUrl: bill.actions?.url ?? bill.actionsUrl ?? null,
 		committeesCount: bill.committees?.count ?? bill.committeesCount ?? null,
@@ -40,125 +27,102 @@ function buildBillData(billId, billStatus, bill) {
 		cosponsorsUrl: bill.cosponsors?.url ?? bill.cosponsorsUrl ?? null,
 		relatedBillsCount: bill.relatedBills?.count ?? bill.relatedBillsCount ?? null,
 		relatedBillsUrl: bill.relatedBills?.url ?? bill.relatedBillsUrl ?? null,
-		sponsors: JSON.stringify(bill.sponsors) ?? null,
+		sponsors: bill.sponsors ?? null,
+		primaryCommitteeName: bill.primaryCommitteeName ?? null,
 		subjectsCount: bill.subjects?.count ?? bill.subjectsCount ?? null,
 		subjectsUrl: bill.subjects?.url ?? bill.subjectsUrl ?? null,
 		summariesCount: bill.summaries?.count ?? bill.summariesCount ?? null,
-		summaraiesUrl: bill.summaries?.url ?? bill.summaraiesUrl ?? null, // typo preserved per schema
+		summaraiesUrl: bill.summaries?.url ?? bill.summaraiesUrl ?? null,
 		textVersionsCount: bill.textVersions?.count ?? bill.textVersionsCount ?? null,
 		textVersionsUrl: bill.textVersions?.url ?? bill.textVersionsUrl ?? null,
 		titlesCount: bill.titles?.count ?? bill.titlesCount ?? null,
 		titlesUrl: bill.titles?.url ?? bill.titlesUrl ?? null
 	};
-}
 
-// ─── Writes ─────────────────────────────────────────────────────────────────
-
-export async function saveBill(billId, billStatus, bill) {
-	const data = buildBillData(billId, billStatus, bill);
-	const existing = await prisma.bill.findUnique({ where: { id: billId } });
-
-	if (existing) {
-		await prisma.bill.update({ where: { id: billId }, data });
-	} else {
-		await prisma.bill.create({ data: { id: billId, ...data } });
+	try {
+		const result = await Bill.findByIdAndUpdate(
+			billId,
+			{ $set: data, $setOnInsert: { _id: billId } },
+			{ upsert: true, new: true }
+		);
+		console.log(`💾 Saved bill ${billId} to MongoDB (_id: ${result._id})`);
+	} catch (err) {
+		console.error(`❌ MongoDB saveBill failed for ${billId}:`, err.message);
+		throw err;
 	}
 }
 
 export async function saveBillActions(billId, actions) {
-	await prisma.billAction.deleteMany({ where: { billId } });
+	await BillAction.deleteMany({ billId });
 
 	if (actions.length > 0) {
-		await prisma.billAction.createMany({
-			data: actions.map((a) => ({
+		await BillAction.insertMany(
+			actions.map((a) => ({
 				billId,
 				actionDate: a.actionDate ?? null,
 				text: a.text ?? null,
 				type: a.type ?? null,
 				actionCode: a.actionCode ?? null,
-				sourceSystem: JSON.stringify(a.sourceSystem ?? null)
+				sourceSystem: a.sourceSystem ?? null
 			}))
-		});
+		);
 	}
 }
 
 export async function saveTextVersion(billId, version, format, content, isFetched) {
-	// Avoid Prisma MongoDB compound unique index issues with nullable fields by
-	// using an explicit findFirst + update/create instead of upsert.
 	const versionType = version.type ?? '';
 	const formatType = format.type ?? '';
 
-	const existing = await prisma.billTextVersion.findFirst({
-		where: { billId, type: versionType, formatType }
-	});
-
-	if (existing) {
-		await prisma.billTextVersion.update({
-			where: { id: existing.id },
-			data: {
-				date: version.date ?? null,
-				url: format.url ?? null,
-				content,
-				contentFetched: isFetched
-			}
-		});
-	} else {
-		await prisma.billTextVersion.create({
-			data: {
-				billId,
-				type: versionType,
-				date: version.date ?? null,
-				formatType,
-				url: format.url ?? null,
-				content,
-				contentFetched: isFetched
-			}
-		});
-	}
+	await BillTextVersion.findOneAndUpdate(
+		{ billId, type: versionType, formatType },
+		{
+			date: version.date ?? null,
+			url: format.url ?? null,
+			content,
+			contentFetched: isFetched
+		},
+		{ upsert: true, new: true }
+	);
 }
 
 // ─── Reads ───────────────────────────────────────────────────────────────────
 
-export async function getBillById(billId) {
-	const bill = await prisma.bill.findUnique({ where: { id: billId } });
-	if (!bill) return null;
+const CURRENT_CONGRESS = 119;
 
-	return {
-		...bill,
-		latestAction: safeParse(bill.latestAction),
-		policyArea: safeParse(bill.policyArea),
-		sponsors: safeParse(bill.sponsors, []),
-		committees: [] // committees not yet stored directly on Mongo Bill model
-	};
+export async function getBillById(billId) {
+	return await Bill.findById(billId).lean();
 }
 
 export async function getBillTextVersions(billId) {
-	const versions = await prisma.billTextVersion.findMany({
-		where: { billId },
-		orderBy: { date: 'desc' }
-	});
-	return versions ?? [];
+	return await BillTextVersion.find({ billId }).sort({ date: -1 }).lean();
 }
 
 export async function getBillActions(billId) {
-	const actions = await prisma.billAction.findMany({
-		where: { billId },
-		orderBy: { actionDate: 'desc' }
-	});
-	return actions ?? [];
+	return await BillAction.find({ billId }).sort({ actionDate: -1 }).lean();
 }
 
 export async function getRecentBills(limit = 20) {
-	const bills = await prisma.bill.findMany({
-		orderBy: { updateDateIncludingText: 'desc' },
-		take: limit
-	});
-
-	return bills.map((bill) => ({
-		...bill,
-		latestAction: safeParse(bill.latestAction),
-		policyArea: safeParse(bill.policyArea),
-		sponsors: safeParse(bill.sponsors, []),
-		committees: []
-	}));
+	return await Bill.find({ congress: CURRENT_CONGRESS }).sort({ updateDateIncludingText: -1 }).limit(limit).lean();
 }
+
+export async function searchBills({ searchQuery, status, chamber, sponsor, dateFrom, dateTo, congress, limit = 40 } = {}) {
+	const filter = { congress: congress ?? CURRENT_CONGRESS };
+
+	if (searchQuery) {
+		const regex = new RegExp(searchQuery, 'i');
+		filter.$or = [{ title: regex }, { billNumber: regex }, { 'policyArea.name': regex }];
+	}
+
+	if (status && status !== 'all') filter.status = status;
+	if (chamber && chamber !== 'all') filter.originChamber = chamber;
+	if (sponsor) filter['sponsors.fullName'] = new RegExp(sponsor, 'i');
+
+	if (dateFrom || dateTo) {
+		filter.updateDate = {};
+		if (dateFrom) filter.updateDate.$gte = dateFrom;
+		if (dateTo) filter.updateDate.$lte = dateTo;
+	}
+
+	return await Bill.find(filter).sort({ updateDateIncludingText: -1 }).limit(limit).lean();
+}
+

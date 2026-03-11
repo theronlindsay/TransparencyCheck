@@ -3,12 +3,12 @@ import { getRecentBills } from '$lib/db/repository.js';
 
 const POLL_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 
+const CURRENT_CONGRESS = 119;
+
 async function refreshBills() {
-	console.log('🔄 Background: refreshing bills from Congress.gov...');
+	console.log('🔄 Background: refreshing most recently updated bills...');
 	try {
-		const dateFrom = new Date();
-		dateFrom.setDate(dateFrom.getDate() - 3);
-		await fetchAndStoreBills({ dateFrom: dateFrom.toISOString().split('T')[0] });
+		await fetchAndStoreBills({ congress: CURRENT_CONGRESS, limit: 40 });
 		console.log('✅ Background: bills refresh complete.');
 	} catch (error) {
 		console.error('❌ Background: bills refresh failed:', error);
@@ -18,7 +18,6 @@ async function refreshBills() {
 // On startup: seed if the DB is empty, then schedule periodic refresh.
 // globalThis guard prevents duplicate intervals when Vite HMR re-executes this module.
 async function initBillSync() {
-	console.log('🧪 initBillSync called, guard =', globalThis._billRefreshInterval);
 	if (globalThis._billRefreshInterval) return;
 	// Set a placeholder immediately so concurrent requests don't double-trigger.
 	globalThis._billRefreshInterval = true;
@@ -27,8 +26,7 @@ async function initBillSync() {
 		const existing = await getRecentBills(1);
 		if (existing.length === 0) {
 			console.log('📭 DB empty on startup — seeding bills...');
-			const dateFrom = `${new Date().getFullYear() - 1}-01-01`;
-			await fetchAndStoreBills({ limit: 40, dateFrom });
+			await fetchAndStoreBills({ congress: CURRENT_CONGRESS, limit: 40 });
 			console.log('✅ Initial seed complete.');
 		}
 	} catch (err) {
@@ -41,7 +39,6 @@ async function initBillSync() {
 
 // Export a handle function so SvelteKit loads this hooks file
 export async function handle({ event, resolve }) {
-	console.log('🪝 handle called:', event.request.method, event.url.pathname);
 	// Trigger bill sync on the first request (non-blocking).
 	initBillSync().catch((err) => console.error('❌ initBillSync failed:', err));
 	// Add CORS headers for cross-origin requests

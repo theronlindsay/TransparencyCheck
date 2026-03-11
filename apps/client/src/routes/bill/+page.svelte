@@ -212,16 +212,7 @@
 		{:else}
 			<div class="bills-grid">
 				{#each filteredBills as bill (bill.id)}
-					<Bill
-						id={bill.id}
-						number={bill.billNumber || bill.number || ''}
-						title={bill.title || 'Untitled Bill'}
-						sponsors={bill.sponsors || []}
-						committee={bill.primaryCommitteeName || 'Unassigned'}
-						statusTag={bill.billType?.toUpperCase() || ''}
-						latestAction={bill.latestAction}
-						updatedAt={bill.updateDate || bill.updatedAt || ''}
-					/>
+					<Bill {bill} />
 				{/each}
 			</div>
 		{/if}
