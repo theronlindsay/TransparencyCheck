@@ -19,6 +19,8 @@ jobs:
           script: |
             cd ~/TransparencyCheck
             git pull origin master
+            npm install
+            npm run install:all
             podman-compose down
             podman-compose build --no-cache
             podman-compose up -d
