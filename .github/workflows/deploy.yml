@@ -21,6 +21,7 @@ jobs:
             git pull origin master
             npm install
             npm run install:all
-            podman-compose down
-            podman-compose build --no-cache
-            podman-compose up -d
+            podman compose down
+            podman compose build --no-cache
+            podman compose up -d
+            echo "🚀 Deployment successful! App running at: http://$(curl -s ifconfig.me):8080"
