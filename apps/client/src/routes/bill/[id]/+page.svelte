@@ -90,15 +90,6 @@
 		}
 	});
 
-	// Debug logging
-	$effect(() => {
-		if (bill) {
-			console.log('Bill ID:', bill?.id);
-			console.log('Text Versions received:', textVersions);
-			console.log('Text Versions length:', textVersions?.length);
-		}
-	});
-
 	function handleRetry() {
 		window.location.reload();
 	}
@@ -138,39 +129,30 @@
 
 	// Group text versions by type (e.g., "Introduced in House", "Engrossed in House")
 	let versionsByType = $derived.by(() => {
-		console.log('🔍 Computing versionsByType...');
-		console.log('textVersions:', textVersions);
-		console.log('textVersions type:', typeof textVersions);
-		console.log('textVersions length:', textVersions?.length);
-		
 		if (!textVersions || textVersions.length === 0) {
-			console.log('❌ No text versions to group');
 			return {};
 		}
-		
-		console.log('✅ Grouping', textVersions.length, 'text versions');
 		
 		const grouped = {};
 		textVersions.forEach(version => {
 			const type = version.type || 'Unknown';
-			console.log(`  - Version type: "${type}", format: "${version.formatType}"`);
 			
 			if (!grouped[type]) {
 				grouped[type] = {
-					date: version.date,
+					type,
+					count: 0,
 					formats: []
 				};
 			}
+			grouped[type].count++;
 			grouped[type].formats.push({
-				formatType: version.formatType,
 				url: version.url,
+				date: version.date,
+				formatType: version.formatType,
 				content: version.content,
 				contentFetched: version.contentFetched
 			});
 		});
-		
-		console.log('📊 Grouped versions:', grouped);
-		console.log('📊 Number of version types:', Object.keys(grouped).length);
 		
 		// Sort formats to put PDF first
 		Object.keys(grouped).forEach(type => {
@@ -184,18 +166,30 @@
 		return grouped;
 	});
 
+	// Format sponsor display - show first sponsor's name and party
+	function formatSponsor(sponsors) {
+		if (!sponsors || sponsors.length === 0) return 'Unknown';
+		
+		const mainSponsor = sponsors[0];
+		if (!mainSponsor) return 'Unknown';
+
+		const name = `${mainSponsor.firstName || ''} ${mainSponsor.lastName || ''}`.trim();
+		const party = mainSponsor.party ? ` [${mainSponsor.party}]` : '';
+		
+		// Fallback if the object is malformed but exists
+		if (!name) return 'Unknown';
+
+		return name + party;
+	}
+
 	// Set initial active version when data loads
 	$effect(() => {
 		if (!activeVersionType && Object.keys(versionsByType).length > 0) {
 			const firstType = Object.keys(versionsByType)[0];
-			console.log('🎯 Setting initial active version type:', firstType);
 			activeVersionType = firstType;
 			
-			// Set first format as active (which is now PDF if available)
 			if (versionsByType[firstType].formats.length > 0) {
-				const initialFormat = versionsByType[firstType].formats[0];
-				console.log('🎯 Setting initial active format:', initialFormat);
-				activeFormat = initialFormat;
+				activeFormat = versionsByType[firstType].formats[0];
 			}
 		}
 	});
@@ -212,11 +206,8 @@
 			if (htmlVersion) {
 				// Check if content is already stored in database
 				if (htmlVersion.contentFetched && htmlVersion.content) {
-					console.log('📚 Using stored content for AI summarizer');
 					aiTextContent = htmlVersion.content;
 				} else {
-					// Fetch the content
-					console.log('📚 Fetching content for AI summarizer');
 					fetch(apiUrl(`/api/fetch-bill-text?url=${encodeURIComponent(htmlVersion.url)}`))
 						.then(response => response.json())
 						.then(data => {
@@ -242,11 +233,9 @@
 			
 			// Check if content is already stored in database
 			if (activeFormat.contentFetched && activeFormat.content) {
-				console.log('Using stored content from database');
 				htmlContent = activeFormat.content;
 				isLoadingHtml = false;
 			} else {
-				console.log('Fetching content via proxy');
 				htmlContent = '';
 				
 				// Use our API proxy to fetch the content (avoids CORS issues)
@@ -292,10 +281,6 @@
 	});
 
 	function selectVersion(type, format) {
-		console.log('📌 Selecting version:');
-		console.log('  Type:', type);
-		console.log('  Format:', format);
-		console.log('  Format URL:', format.url);
 		activeVersionType = type;
 		activeFormat = format;
 	}
@@ -369,7 +354,6 @@
 		
 		const billTypeFormatted = typeMap[billType] || `${billType}-bill`;
 		const url = `https://www.congress.gov/bill/${congressFormatted}/${billTypeFormatted}/${billNum}`;
-		console.log(`Generated Congress URL: ${url}`);
 		return url;
 	}
 </script>
@@ -413,11 +397,11 @@
 			</div>
 			<div class="meta-item">
 				<span class="meta-label">Sponsor</span>
-				<span class="meta-value">{bill.sponsor || 'Unknown'}</span>
+				<span class="meta-value">{formatSponsor(bill.sponsors)}</span>
 			</div>
 			<div class="meta-item">
 				<span class="meta-label">Committee</span>
-				<span class="meta-value">{bill.committee || 'Unassigned'}</span>
+				<span class="meta-value">{bill.primaryCommitteeName || 'Unassigned'}</span>
 			</div>
 			<div class="meta-item">
 				<span class="meta-label">Last Updated</span>
@@ -576,7 +560,7 @@
 							{#each versionData.formats as format}
 								<button
 									class="format-tab"
-									class:active={activeVersionType === type && activeFormat === format}
+									class:active={activeVersionType === type && activeFormat?.url === format.url}
 									onclick={() => selectVersion(type, format)}
 								>
 									<span class="format-icon">{getFormatIcon(format.formatType)}</span>

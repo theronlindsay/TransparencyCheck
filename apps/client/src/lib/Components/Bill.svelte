@@ -3,16 +3,19 @@
 
 	// Props for bill data
 	let {
-		id = '',
-		number = '',
-		title = '',
-		sponsors = [],
-		committee = '',
-		statusTag = '',
-		latestAction = '',
-		updatedAt = '',
+		bill = {},
 		onclick = null
 	} = $props();
+
+	// Computed properties for template usage to standardize differences between APIs
+	const id = $derived(bill.id || bill._id || '');
+	const number = $derived(bill.billNumber || bill.number || '');
+	const title = $derived(bill.title || '');
+	const sponsors = $derived(bill.sponsors || []);
+	const committee = $derived(bill.primaryCommitteeName || 'Unassigned');
+	const statusTag = $derived(bill.status || bill.statusTag || bill.billType?.toUpperCase() || '');
+	const latestAction = $derived(bill.latestAction || '');
+	const updatedAt = $derived(bill.updateDate || bill.updatedAt || '');
 
 	let isHovered = $state(false);
 

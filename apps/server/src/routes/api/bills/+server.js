@@ -3,13 +3,11 @@ import { getRecentBills } from '$lib/db/repository.js';
 
 export async function GET() {
 	try {
-		// Repository handles Mongo-first with SQLite fallback
 		const bills = await getRecentBills(100);
-
-		return json(bills);
+		return json(bills.map((b) => ({ ...b, id: b._id })));
 	} catch (error) {
 		console.error('Error fetching bills:', error);
-		return json({ error: error.message }, { status: 500});
+		return json({ error: error.message }, { status: 500 });
 	}
 }
 

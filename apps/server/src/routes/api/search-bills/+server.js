@@ -1,5 +1,10 @@
 import { json } from '@sveltejs/kit';
 import { fetchAndStoreBills, fetchAndStoreBillsGenerator } from '$lib/bill-fetcher.js';
+import { searchBills } from '$lib/db/repository.js';
+
+// Default: only consider bills updated within the last 2 years to avoid ancient results.
+const DEFAULT_DATE_FROM = `${new Date().getFullYear() - 2}-01-01`;
+
 
 // Helper function to determine bill status from API data
 // This is kept here for formatting the response, as the fetcher module only stores raw data.
@@ -71,7 +76,7 @@ export async function GET({ url }) {
 
 					console.log(`Starting stream for bills`);
 
-					for await (const bill of fetchAndStoreBillsGenerator({ searchQuery, dateFrom, dateTo })) {
+					for await (const bill of fetchAndStoreBillsGenerator({ searchQuery, dateFrom, dateTo, congress: 119 })) {
 						try {
 							const billStatus = determineBillStatus(bill);
 
@@ -89,7 +94,8 @@ export async function GET({ url }) {
 								updateDate: bill.updateDate,
 								url: bill.url,
 								policyArea: bill.policyArea?.name || '',
-								sponsors: bill.sponsors?.map((s) => s.fullName).join(', ') || ''
+								sponsors: bill.sponsors || [],
+								primaryCommitteeName: bill.primaryCommitteeName || null
 							};
 
 							// Apply filters
@@ -101,13 +107,28 @@ export async function GET({ url }) {
 
 							if (sponsor && shouldInclude) {
 								const sponsorLower = sponsor.toLowerCase();
-								if (!formattedBill.sponsors.toLowerCase().includes(sponsorLower)) {
+								const sponsorStr = Array.isArray(formattedBill.sponsors) 
+									? formattedBill.sponsors.map(s => s ? `${s.firstName || ''} ${s.lastName || ''} ${s.fullName || ''}` : '').join(' ').toLowerCase() 
+									: '';
+								if (!sponsorStr.includes(sponsorLower)) {
 									shouldInclude = false;
 								}
 							}
 
 							if (status && status !== 'all' && formattedBill.status !== status) {
 								shouldInclude = false;
+							}
+
+							if (dateFrom && shouldInclude) {
+								if (formattedBill.updateDate && formattedBill.updateDate < dateFrom) {
+									shouldInclude = false;
+								}
+							}
+
+							if (dateTo && shouldInclude) {
+								if (formattedBill.updateDate && formattedBill.updateDate > dateTo) {
+									shouldInclude = false;
+								}
 							}
 
 							if (shouldInclude) {
@@ -136,7 +157,7 @@ export async function GET({ url }) {
 		}
 
 		// Non-streaming response
-		const bills = await fetchAndStoreBills({ searchQuery, dateFrom, dateTo });
+		const bills = await fetchAndStoreBills({ searchQuery, dateFrom, dateTo, congress: 119 });
 		const formattedBills = bills.map((bill) => {
 			const billStatus = determineBillStatus(bill);
 			return {
@@ -153,7 +174,8 @@ export async function GET({ url }) {
 				updateDate: bill.updateDate,
 				url: bill.url,
 				policyArea: bill.policyArea?.name || '',
-				sponsors: bill.sponsors?.map((s) => s.fullName).join(', ') || ''
+				sponsors: bill.sponsors || [],
+				primaryCommitteeName: bill.primaryCommitteeName || null
 			};
 		});
 
@@ -167,13 +189,22 @@ export async function GET({ url }) {
 		if (sponsor) {
 			const sponsorLower = sponsor.toLowerCase();
 			filteredBills = filteredBills.filter((bill) => {
-				const sponsors = bill.sponsors || '';
-				return sponsors.toLowerCase().includes(sponsorLower);
+				const sponsorsArray = Array.isArray(bill.sponsors) ? bill.sponsors : [];
+				const sponsorStr = sponsorsArray.map(s => s ? `${s.firstName || ''} ${s.lastName || ''} ${s.fullName || ''}` : '').join(' ').toLowerCase();
+				return sponsorStr.includes(sponsorLower);
 			});
 		}
 
 		if (status && status !== 'all') {
 			filteredBills = filteredBills.filter((bill) => bill.status === status);
+		}
+
+		if (dateFrom) {
+			filteredBills = filteredBills.filter((bill) => bill.updateDate && bill.updateDate >= dateFrom);
+		}
+
+		if (dateTo) {
+			filteredBills = filteredBills.filter((bill) => bill.updateDate && bill.updateDate <= dateTo);
 		}
 
 		return json({

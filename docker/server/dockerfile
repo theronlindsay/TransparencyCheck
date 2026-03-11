@@ -2,11 +2,6 @@ FROM docker.io/library/node:22 AS build
 
 WORKDIR /app
 
-# Tools for native deps (sqlite3)
-RUN apt-get update \
-	&& apt-get install -y python3 make g++ \
-	&& rm -rf /var/lib/apt/lists/*
-
 # Copy root and app package files
 COPY package*.json ./
 COPY apps/server/package.json ./apps/server/
@@ -23,13 +18,7 @@ RUN if [ -f /app/package-lock.json ]; then \
 # Install all dependencies (workspace aware)
 RUN npm install
 
-# Fix for SvelteKit build step hitting SQLite without DB path existing
-RUN mkdir -p /app/db /app/apps/server/db
-
 COPY . .
-
-# Rebuild native modules for Docker's Node version (local copy may be compiled for a different version)
-RUN npm rebuild better-sqlite3
 
 # Build server only
 RUN npm run build:server
@@ -45,12 +34,17 @@ ENV NODE_ENV=production
 # Copy only server files needed at runtime
 COPY --from=build /app/package*.json ./
 COPY --from=build /app/apps/server/package*.json ./apps/server/
-COPY --from=build /app/apps/server/prisma ./apps/server/prisma
-COPY --from=build /app/apps/server/src/lib/db/generated ./src/lib/db/generated
-COPY --from=build /app/apps/server/src/lib/db/generated ./apps/server/src/lib/db/generated
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/apps/server/node_modules ./apps/server/node_modules
 COPY --from=build /app/apps/server/build ./apps/server/build
+
+# Copy startup script
+COPY docker/server/start.sh ./start.sh
+RUN chmod +x ./start.sh
+
+EXPOSE 3000
+
+CMD ["./start.sh"]
 
 # Copy startup script
 COPY docker/server/start.sh ./start.sh

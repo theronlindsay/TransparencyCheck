@@ -5,9 +5,8 @@ import {
 	getBillActions,
 	fetchAndStoreTextVersions
 } from '$lib/db/bills.js';
-import { env } from '$env/dynamic/private';
 
-const CONGRESS_API_KEY = env.CONGRESS_API_KEY;
+const CONGRESS_API_KEY = process.env.CONGRESS_API_KEY;
 
 export async function GET({ params }) {
 	try {
@@ -42,12 +41,13 @@ export async function GET({ params }) {
 
 		// Format the bill data
 		const bill = {
-			id: billData.id,
+			...billData,
+			id: billData._id,
 			number: formatBillNumber(billData.billNumber, billData.type),
 			congress: billData.congress,
 			title: billData.title,
-			sponsor: formatSponsor(billData.sponsors),
-			committee: billData.primaryCommitteeName || 'Unassigned',
+			sponsors: billData.sponsors,
+			primaryCommitteeName: billData.primaryCommitteeName,
 			updatedAt: billData.updateDate,
 			latestAction: getLatestActionText(billData.latestAction),
 			summary: billData.summaries || null,

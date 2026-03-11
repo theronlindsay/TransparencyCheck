@@ -95,12 +95,12 @@
 
 		<!-- Date Range -->
 		<div class="filter-group">
-			<label for="dateFrom">Introduced From</label>
+			<label for="dateFrom">Updated From</label>
 			<input type="date" id="dateFrom" bind:value={dateFrom} />
 		</div>
 
 		<div class="filter-group">
-			<label for="dateTo">Introduced To</label>
+			<label for="dateTo">Updated To</label>
 			<input type="date" id="dateTo" bind:value={dateTo} />
 		</div>
 
