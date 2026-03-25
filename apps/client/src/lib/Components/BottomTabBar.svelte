@@ -1,7 +1,59 @@
 <script>
+	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import { showAISummarizer, toggleAISummarizer } from '$lib/stores/ui.js';
+	import { resolve } from '$app/paths';
+	import { isAuthenticated } from '$lib/stores/auth.js';
+	import { onMount } from 'svelte';
+
+	const TRAIL_KEY = 'tc:recent-page-trail';
+	const MAX_TRAIL_LENGTH = 12;
+	let pageTrail = [];
+	let suppressNextRecord = false;
+
+	function toRouteKey(url) {
+		return `${url.pathname}${url.search}${url.hash}`;
+	}
+
+	function loadTrail() {
+		if (!browser) return;
+		try {
+			const raw = sessionStorage.getItem(TRAIL_KEY);
+			const parsed = raw ? JSON.parse(raw) : [];
+			if (Array.isArray(parsed)) {
+				pageTrail = parsed.filter((item) => typeof item === 'string').slice(-MAX_TRAIL_LENGTH);
+			}
+		} catch {
+			pageTrail = [];
+		}
+	}
+
+	function saveTrail() {
+		if (!browser) return;
+		sessionStorage.setItem(TRAIL_KEY, JSON.stringify(pageTrail.slice(-MAX_TRAIL_LENGTH)));
+	}
+
+	onMount(() => {
+		loadTrail();
+
+		const unsubscribe = page.subscribe(($page) => {
+			const currentRoute = toRouteKey($page.url);
+			if (suppressNextRecord) {
+				suppressNextRecord = false;
+				return;
+			}
+
+			const lastRoute = pageTrail[pageTrail.length - 1];
+			if (lastRoute === currentRoute) {
+				return;
+			}
+
+			pageTrail = [...pageTrail, currentRoute].slice(-MAX_TRAIL_LENGTH);
+			saveTrail();
+		});
+
+		return () => unsubscribe();
+	});
 
 	function goHome() {
 		goto('/');
@@ -11,76 +63,113 @@
 		goto('/table');
 	}
 
-	function handleAIClick() {
-		// Toggle the AI summarizer visibility
-		toggleAISummarizer();
-		// If turning on, scroll to it after a brief delay
-		if (!$showAISummarizer) {
-			setTimeout(() => {
-				const summarizer = document.querySelector('.ai-summarizer');
-				if (summarizer) {
-					summarizer.scrollIntoView({ behavior: 'smooth' });
-				}
-			}, 100);
-		}
-	}
-
 	function goBack() {
+		const currentRoute = toRouteKey($page.url);
+		let trail = [...pageTrail];
+
+		// Remove current page if it is at the top of the trail.
+		if (trail[trail.length - 1] === currentRoute) {
+			trail.pop();
+		}
+
+		const previousRoute = trail[trail.length - 1];
+		if (previousRoute) {
+			pageTrail = trail;
+			saveTrail();
+			suppressNextRecord = true;
+			goto(previousRoute);
+			return;
+		}
+
 		if (window.history.state && window.history.state.idx > 0) {
 			window.history.back();
-		} else {
-			goto('/');
+			return;
 		}
+
+		goto(resolve('/'));
+	}
+
+	function goAccount() {
+		if ($isAuthenticated) {
+			goto(resolve('/account'));
+			return;
+		}
+
+		goto(resolve('/auth'));
 	}
 </script>
 
 <nav class="bottom-tab-bar">
-	<button 
-		class="tab-item" 
+	<button
+		class="tab-item"
 		class:active={$page.url.pathname === '/'}
 		onclick={goHome}
 		aria-label="Home"
 	>
-		<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+		<svg
+			width="24"
+			height="24"
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="2"
+		>
 			<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
 			<polyline points="9 22 9 12 15 12 15 22"></polyline>
 		</svg>
 		<span>Home</span>
 	</button>
 
-	<button 
+	<button
 		class="tab-item"
 		class:active={$page.url.pathname === '/table'}
 		onclick={goSearch}
 		aria-label="Search"
 	>
-		<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+		<svg
+			width="24"
+			height="24"
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="2"
+		>
 			<circle cx="11" cy="11" r="8"></circle>
 			<line x1="21" y1="21" x2="16.65" y2="16.65"></line>
 		</svg>
 		<span>Search</span>
 	</button>
 
-	<button 
+	<button
 		class="tab-item"
-		class:active={$showAISummarizer}
-		onclick={handleAIClick}
-		aria-label="AI"
+		class:active={$page.url.pathname.startsWith('/account') ||
+			$page.url.pathname.startsWith('/auth')}
+		onclick={goAccount}
+		aria-label="Account"
 	>
-		<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-			<path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"></path>
-			<circle cx="7.5" cy="14.5" r="1.5" fill="currentColor"></circle>
-			<circle cx="16.5" cy="14.5" r="1.5" fill="currentColor"></circle>
+		<svg
+			width="24"
+			height="24"
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="2"
+		>
+			<path d="M20 21a8 8 0 0 0-16 0"></path>
+			<circle cx="12" cy="8" r="4"></circle>
 		</svg>
-		<span>AI</span>
+		<span>Account</span>
 	</button>
 
-	<button 
-		class="tab-item"
-		onclick={goBack}
-		aria-label="Back"
-	>
-		<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+	<button class="tab-item" onclick={goBack} aria-label="Back">
+		<svg
+			width="24"
+			height="24"
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="2"
+		>
 			<line x1="19" y1="12" x2="5" y2="12"></line>
 			<polyline points="12 19 5 12 12 5"></polyline>
 		</svg>
@@ -118,7 +207,9 @@
 		border: none;
 		color: var(--text-secondary);
 		cursor: pointer;
-		transition: color 0.2s ease, transform 0.2s ease;
+		transition:
+			color 0.2s ease,
+			transform 0.2s ease;
 		flex: 1;
 		min-height: 56px;
 	}

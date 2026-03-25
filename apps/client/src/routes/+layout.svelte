@@ -1,23 +1,21 @@
 <script>
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
-	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import favicon from '$lib/assets/favicon.svg';
-	import Navbar from '$lib/Components/Navbar.svelte';
 	import BottomTabBar from '$lib/Components/BottomTabBar.svelte';
-	import { getApiBaseUrl } from '$lib/config.js';
+	import AIAssistant from '$lib/Components/AIAssistant.svelte';
+	import { refreshSession } from '$lib/stores/auth.js';
 	import { pwaInfo } from 'virtual:pwa-info';
 	import '../lib/styles/theme.css';
-
-	import GoogleAdsense from "$lib/Components/Adsense.svelte";
-	import GoogleAnalytics from "$lib/Components/Analytics.svelte";
-	let promotionEnabled = $state(true);
 
 	let { children } = $props();
 	let isScrolled = $state(false);
 	let isCompactHeader = $derived($page.url.pathname !== '/' || isScrolled);
 
 	onMount(async () => {
+		refreshSession();
+
 		if (pwaInfo) {
 			const { registerSW } = await import('virtual:pwa-register');
 			registerSW({
@@ -50,12 +48,12 @@
 						App.exitApp();
 					}
 				});
-			} catch (e) {
+			} catch {
 				console.log('Capacitor App plugin not available');
 			}
 		}
 
-			return () => {
+		return () => {
 			window.removeEventListener('scroll', handleScroll);
 			if (backButtonListener) {
 				backButtonListener.remove();
@@ -64,34 +62,33 @@
 	});
 </script>
 
-<GoogleAnalytics enabled={promotionEnabled} />
-<GoogleAdsense enabled={promotionEnabled} />
-
 <svelte:head>
 	<link rel="icon" href={favicon} />
-	{@html pwaInfo?.webManifest.linkTag}
+	{#if pwaInfo?.webManifest?.href}
+		<link
+			rel="manifest"
+			href={pwaInfo.webManifest.href}
+			crossorigin={pwaInfo.webManifest.useCredentials ? 'use-credentials' : undefined}
+		/>
+	{/if}
 </svelte:head>
 
 <div class="app-layout">
-
-	
-
 	<div class="navbar-container" class:scrolled={isCompactHeader}>
 		<div class="app-header">
-			<a href="/" class="logo-link">
-				<img src="/Logo.png" alt="Transparency Check"/>
+			<a href={resolve('/')} class="logo-link">
+				<img src="/Logo.png" alt="Transparency Check" />
 			</a>
 		</div>
 
 		<!-- <Navbar /> -->
 	</div>
 
-	
-
 	<div class="app-content">
 		{@render children?.()}
 	</div>
 
+	<AIAssistant />
 	<BottomTabBar />
 </div>
 
@@ -106,6 +103,7 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
+		gap: 1rem;
 		padding: 1rem 2rem;
 		transition: padding 0.3s ease;
 	}
@@ -121,7 +119,9 @@
 
 	.app-header img {
 		width: 300px;
-		transition: width 0.3s ease, margin 0.3s ease;
+		transition:
+			width 0.3s ease,
+			margin 0.3s ease;
 	}
 
 	.navbar-container {
@@ -163,9 +163,15 @@
 		}
 
 		.app-header {
-			flex-direction: column;
+			flex-direction: row;
+			justify-content: flex-start;
+			align-items: center;
 			gap: 1rem;
 			padding: 1rem;
+		}
+
+		.app-header img {
+			width: 180px;
 		}
 	}
 </style>

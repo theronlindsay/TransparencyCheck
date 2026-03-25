@@ -67,3 +67,5 @@ apps/server/db
 apps/server/prisma/apps/server/db
 
 instructions.txt
+.env
+.claude

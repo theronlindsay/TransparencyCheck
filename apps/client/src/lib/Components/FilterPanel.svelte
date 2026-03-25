@@ -1,27 +1,26 @@
 <script>
+	import posthog from 'posthog-js';
+
 	let {
-		searchQuery = $bindable(''),
 		statusFilter = $bindable('all'),
 		chamberFilter = $bindable('all'),
 		sponsorFilter = $bindable(''),
 		dateFrom = $bindable(''),
 		dateTo = $bindable(''),
 		itemsPerPage = $bindable(25),
-		searchCongress = $bindable(false),
 		resultsSummary = '',
 		onReset = () => {},
-		onSearchCongress = () => {}
+		onApply = () => {}
 	} = $props();
 
 	function handleReset() {
-		searchQuery = '';
+		posthog.capture('bills_filtered', { action: 'reset' });
 		statusFilter = 'all';
 		chamberFilter = 'all';
 		sponsorFilter = '';
 		dateFrom = '';
 		dateTo = '';
 		itemsPerPage = 25;
-		searchCongress = false;
 		if (onReset) {
 			onReset();
 		}
@@ -35,17 +34,6 @@
 	</div>
 
 	<div class="filter-grid">
-		<!-- Search -->
-		<div class="filter-group full-width">
-			<label for="search">Search Bills</label>
-			<input
-				type="text"
-				id="search"
-				bind:value={searchQuery}
-				placeholder="Search by title, bill number, or description..."
-			/>
-		</div>
-
 		<!-- Status Filter -->
 		<div class="filter-group">
 			<label for="status">Status</label>
@@ -103,17 +91,10 @@
 			<label for="dateTo">Updated To</label>
 			<input type="date" id="dateTo" bind:value={dateTo} />
 		</div>
+	</div>
 
-		<!-- Search Congress Button -->
-		<div class="filter-group congress-search-group">
-			<button 
-				class="congress-search-button" 
-				onclick={onSearchCongress}
-			>
-				<span class="button-text">Search Congress.gov</span>
-			</button>
-			<p class="congress-hint">Search Congress.gov with current filters applied</p>
-		</div>
+	<div class="filter-actions">
+		<button class="apply-button" onclick={onApply}>Apply</button>
 	</div>
 
 	<!-- Results Summary -->
@@ -176,10 +157,6 @@
 		gap: 0.5rem;
 	}
 
-	.filter-group.full-width {
-		grid-column: 1 / -1;
-	}
-
 	label {
 		font-size: 0.9rem;
 		font-weight: 500;
@@ -210,49 +187,35 @@
 		color: var(--text-tertiary);
 	}
 
-	.congress-search-group {
-		grid-column: 1 / -1;
-		padding-top: 0.5rem;
+	.filter-actions {
+		display: flex;
+		justify-content: flex-end;
+		margin-top: 1rem;
+		padding-top: 1rem;
 		border-top: 1px solid var(--border-color);
 	}
 
-	.congress-search-button {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 0.75rem;
-		padding: 0.875rem 1.25rem;
+	.apply-button {
+		padding: 0.75rem 1.15rem;
 		background: var(--accent);
 		color: #fff;
-		border: 2px solid var(--accent);
+		border: 1px solid var(--accent);
 		border-radius: var(--radius-md);
 		cursor: pointer;
-		font-size: 1rem;
+		font-size: 0.95rem;
 		font-weight: 600;
 		transition: all 0.2s;
-		width: 100%;
 	}
 
-	.congress-search-button:hover {
+	.apply-button:hover {
 		background: #d63a37;
 		border-color: #d63a37;
 		transform: translateY(-1px);
 		box-shadow: 0 2px 8px rgba(241, 58, 55, 0.3);
 	}
 
-	.congress-search-button:active {
+	.apply-button:active {
 		transform: translateY(0);
-	}
-
-	.button-text {
-		font-weight: 600;
-	}
-
-	.congress-hint {
-		margin: 0.5rem 0 0 0;
-		font-size: 0.85rem;
-		color: var(--text-tertiary);
-		font-style: italic;
 	}
 
 	.results-summary {
@@ -288,6 +251,14 @@
 		.filter-grid {
 			grid-template-columns: 1fr;
 			gap: 1rem;
+		}
+
+		.filter-actions {
+			justify-content: stretch;
+		}
+
+		.apply-button {
+			width: 100%;
 		}
 	}
 </style>

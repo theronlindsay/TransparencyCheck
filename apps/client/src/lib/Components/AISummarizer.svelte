@@ -1,6 +1,7 @@
 <script>
 	import { browser } from '$app/environment';
 	import { apiUrl } from '$lib/config.js';
+	import posthog from 'posthog-js';
 
 	let { billNumber, billTitle, billText = '' } = $props();
 
@@ -8,16 +9,15 @@
 	let readingLevel = $state('general');
 	let enableWebSearch = $state(false);
 	let getOpinion = $state(false);
-	let specificQuestion = $state('');
 	let outputLength = $state(100);
 	let generatedPrompt = $state('');
 	let aiResponse = $state('');
 	let showPrompt = $state(false);
 	let isLoading = $state(false);
-	
+
 	// Validation errors from server
 	let serverErrors = $state([]);
-	
+
 	// Chat state
 	let conversationId = $state(null);
 	let chatMessages = $state([]);
@@ -31,30 +31,34 @@
 		serverErrors = [];
 
 		isLoading = true;
-		
+
 		// Show spinner using classList
 		const spinner = document.querySelector('.btn-primary .spinner');
 		if (spinner) {
 			spinner.classList.add('visible');
 		}
-		
+
 		// Add loading state to form using classList
 		const form = document.querySelector('.summarizer-form');
 		if (form) {
 			form.classList.add('processing');
 		}
-		
+
 		let prompt = `Please summarize bill ${billNumber}\n\n`;
 
 		prompt += `Follow these parameters in your summary:\n\n`;
 
 		// Reading Level Dictionary
 		const readingLevels = {
-			'elementary': 'Explain this at an elementary school reading level (ages 6-10), using very simple words and short sentences.',
-			'middle-school': 'Explain this at a middle school reading level (ages 11-13), using clear and straightforward language.',
-			'high-school': 'Explain this at a high school reading level (ages 14-18), using accessible but more sophisticated language.',
-			'general': 'Explain this for a general adult audience with clear, professional language.',
-			'expert': 'Provide a detailed, technical summary for someone with expertise in policy and legislation.'
+			elementary:
+				'Explain this at an elementary school reading level (ages 6-10), using very simple words and short sentences.',
+			'middle-school':
+				'Explain this at a middle school reading level (ages 11-13), using clear and straightforward language.',
+			'high-school':
+				'Explain this at a high school reading level (ages 14-18), using accessible but more sophisticated language.',
+			general: 'Explain this for a general adult audience with clear, professional language.',
+			expert:
+				'Provide a detailed, technical summary for someone with expertise in policy and legislation.'
 		};
 		prompt += `Reading Level: ${readingLevels[readingLevel]}\n\n`;
 
@@ -65,16 +69,12 @@
 
 		// Add opinion/implications
 		if (getOpinion) {
-			prompt += 'Provide Analysis: Please provide your analysis of the potential implications of this bill, including:\n';
+			prompt +=
+				'Provide Analysis: Please provide your analysis of the potential implications of this bill, including:\n';
 			prompt += `- Potential positive impacts\n`;
 			prompt += `- Potential negative impacts\n`;
 			prompt += `- Groups or industries that may be affected\n`;
 			prompt += `- Economic, social, or political considerations\n\n`;
-		}
-
-		// Add specific question
-		if (specificQuestion.trim()) {
-			prompt += `Make sure to answer the following question: ${specificQuestion.trim()}\n\n`;
 		}
 
 		// Add character limit
@@ -84,19 +84,19 @@
 
 		prompt += `Please provide a comprehensive yet concise summary that addresses all the points above. `;
 
-        // Add the bill text if available
+		// Add the bill text if available
 		if (billText && billText.trim()) {
 			// Strip HTML tags for cleaner prompt
 			const tempDiv = document.createElement('div');
 			tempDiv.innerHTML = billText;
 			let plainText = tempDiv.textContent || tempDiv.innerText || '';
-			
+
 			// Remove everything before and including <DOC>
 			const docIndex = plainText.indexOf('<DOC>');
 			if (docIndex !== -1) {
 				plainText = plainText.substring(docIndex + 5); // +5 to skip "<DOC>"
 			}
-			
+
 			prompt += `Bill Text:\n${plainText.trim()}\n\n---\n\n`;
 		}
 
@@ -105,12 +105,12 @@
 		// Call API endpoint to send prompt to Node Server
 		try {
 			const requestBody = { prompt };
-			
+
 			// Add tools array if web search is enabled
 			if (enableWebSearch) {
-				requestBody.tools = [{ type: "web_search_preview" }];
+				requestBody.tools = [{ type: 'web_search_preview' }];
 			}
-			
+
 			const response = await fetch(apiUrl('/api/openAI'), {
 				method: 'POST',
 				headers: {
@@ -122,7 +122,7 @@
 			if (!response.ok) {
 				console.error('Failed to send prompt to server:', response.statusText);
 				const errorData = await response.json();
-				
+
 				// Display server validation errors
 				if (errorData.validationErrors) {
 					serverErrors = errorData.validationErrors;
@@ -138,41 +138,60 @@
 				// API call succeeded, show the response
 				aiResponse = data.response;
 				conversationId = data.conversationId; // Save for follow-up questions
-				
+
 				// Add initial exchange to chat history
-				chatMessages = [{
-					role: 'user',
-					content: 'Summarize this bill with the selected options'
-				}, {
-					role: 'assistant',
-					content: data.response
-				}];
-				
+				chatMessages = [
+					{
+						role: 'user',
+						content: 'Summarize this bill with the selected options'
+					},
+					{
+						role: 'assistant',
+						content: data.response
+					}
+				];
+
 				serverErrors = []; // Clear any errors
+				posthog.capture('ai_summary_generated', {
+					bill_number: billNumber,
+					reading_level: readingLevel,
+					web_search_enabled: enableWebSearch,
+					get_opinion: getOpinion,
+					output_length: outputLength
+				});
 			} else {
 				// If API succeeded but no response, keep showing the prompt
 				console.warn('No response from AI');
 				serverErrors = ['No response received from AI'];
+				posthog.capture('ai_summary_error', {
+					bill_number: billNumber,
+					error_message: 'No response received from AI'
+				});
 			}
 		} catch (error) {
 			console.error('Error calling API endpoint:', error);
 			serverErrors = ['Network error: ' + error.message];
+			posthog.captureException(error, { bill_number: billNumber });
+			posthog.capture('ai_summary_error', {
+				bill_number: billNumber,
+				error_message: error.message
+			});
 		} finally {
 			isLoading = false;
 			showPrompt = true;
-			
+
 			// Hide spinner using classList
 			const spinner = document.querySelector('.btn-primary .spinner');
 			if (spinner) {
 				spinner.classList.remove('visible');
 			}
-			
+
 			// Remove loading state from form using classList
 			const form = document.querySelector('.summarizer-form');
 			if (form) {
 				form.classList.remove('processing');
 			}
-			
+
 			// Add success indicator to prompt display
 			setTimeout(() => {
 				const promptDisplay = document.querySelector('.prompt-display');
@@ -187,71 +206,76 @@
 		readingLevel = 'general';
 		enableWebSearch = false;
 		getOpinion = false;
-		specificQuestion = '';
-		focusTopic = '';
 		generatedPrompt = '';
 		aiResponse = '';
 		showPrompt = false;
 		conversationId = null;
 		chatMessages = [];
 		outputLength = 100;
-		
+
 		// Remove visible class from prompt display
 		const promptDisplay = document.querySelector('.prompt-display');
 		if (promptDisplay) {
 			promptDisplay.classList.remove('visible');
 		}
 	}
-	
+
 	// Send follow-up question in chat
 	async function sendFollowUp() {
 		if (!followUpQuestion.trim() || !conversationId || isSendingFollowUp) return;
-		
+
 		const question = followUpQuestion.trim();
 		followUpQuestion = '';
 		isSendingFollowUp = true;
-		
+		posthog.capture('ai_followup_sent', { bill_number: billNumber });
+
 		// Add user message to chat
 		chatMessages = [...chatMessages, { role: 'user', content: question }];
-		
+
 		try {
-			const requestBody = { 
+			const requestBody = {
 				prompt: question,
 				conversationId: conversationId
 			};
-			
+
 			// Add tools if web search was enabled
 			if (enableWebSearch) {
-				requestBody.tools = [{ type: "web_search_preview" }];
+				requestBody.tools = [{ type: 'web_search_preview' }];
 			}
-			
+
 			const response = await fetch(apiUrl('/api/openAI'), {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(requestBody)
 			});
-			
+
 			const data = await response.json();
-			
+
 			if (data.success && data.response) {
 				// Update conversation ID and add response to chat
 				conversationId = data.conversationId;
 				chatMessages = [...chatMessages, { role: 'assistant', content: data.response }];
 				aiResponse = data.response; // Update main response too
 			} else {
-				chatMessages = [...chatMessages, { 
-					role: 'error', 
-					content: data.error || 'Failed to get response' 
-				}];
+				chatMessages = [
+					...chatMessages,
+					{
+						role: 'error',
+						content: data.error || 'Failed to get response'
+					}
+				];
 			}
 		} catch (error) {
-			chatMessages = [...chatMessages, { 
-				role: 'error', 
-				content: 'Network error: ' + error.message 
-			}];
+			chatMessages = [
+				...chatMessages,
+				{
+					role: 'error',
+					content: 'Network error: ' + error.message
+				}
+			];
 		} finally {
 			isSendingFollowUp = false;
-			
+
 			// Scroll chat to bottom
 			setTimeout(() => {
 				const chatContainer = document.querySelector('.chat-messages');
@@ -261,14 +285,14 @@
 			}, 50);
 		}
 	}
-	
+
 	function handleChatKeydown(event) {
 		if (event.key === 'Enter' && !event.shiftKey) {
 			event.preventDefault();
 			sendFollowUp();
 		}
 	}
-	
+
 	// Add interactive highlighting using classList
 	function handleFocus(event) {
 		const formGroup = event.target.closest('.form-group');
@@ -276,14 +300,14 @@
 			formGroup.classList.add('focused');
 		}
 	}
-	
+
 	function handleBlur(event) {
 		const formGroup = event.target.closest('.form-group');
 		if (formGroup) {
 			formGroup.classList.remove('focused');
 		}
 	}
-	
+
 	function handleCheckboxToggle(event) {
 		const checkboxGroup = event.target.closest('.checkbox-group');
 		if (checkboxGroup) {
@@ -298,17 +322,13 @@
 </script>
 
 <div class="ai-summarizer">
-	<div class="summarizer-header">
-		<h3>AI Bill Summarizer</h3>
-    </div>
-
 	<div class="summarizer-form">
 		<!-- Reading Level Selector -->
 		<div class="form-group">
 			<label for="reading-level" class="text-label">Reading Level</label>
-			<select 
-				id="reading-level" 
-				bind:value={readingLevel} 
+			<select
+				id="reading-level"
+				bind:value={readingLevel}
 				class="select-input"
 				onfocus={handleFocus}
 				onblur={handleBlur}
@@ -324,11 +344,7 @@
 		<!-- Web Search Toggle -->
 		<div class="form-group checkbox-group">
 			<label class="checkbox-label">
-				<input 
-					type="checkbox" 
-					bind:checked={enableWebSearch}
-					onchange={handleCheckboxToggle}
-				/>
+				<input type="checkbox" bind:checked={enableWebSearch} onchange={handleCheckboxToggle} />
 				<span class="checkbox-text">
 					<span class="checkbox-title">Enable Web Search</span>
 					<span class="checkbox-description">Include recent news and analysis</span>
@@ -339,34 +355,12 @@
 		<!-- Opinion/Implications Checkbox -->
 		<div class="form-group checkbox-group">
 			<label class="checkbox-label">
-				<input 
-					type="checkbox" 
-					bind:checked={getOpinion}
-					onchange={handleCheckboxToggle}
-				/>
+				<input type="checkbox" bind:checked={getOpinion} onchange={handleCheckboxToggle} />
 				<span class="checkbox-text">
 					<span class="checkbox-title">Analyze Implications</span>
 					<span class="checkbox-description">Get AI's analysis of potential impacts</span>
 				</span>
 			</label>
-		</div>
-
-		<!-- Specific Question -->
-		<div class="form-group">
-			<label for="specific-question" class="text-label">
-				Ask a Specific Question
-				<span class="char-count">{specificQuestion.length}/500</span>
-			</label>
-			<textarea
-				id="specific-question"
-				bind:value={specificQuestion}
-				placeholder="e.g., How does this bill affect small businesses?"
-				class="textarea-input"
-				rows="3"
-				maxlength="500"
-				onfocus={handleFocus}
-				onblur={handleBlur}
-			></textarea>
 		</div>
 
 		<!-- Focus Topic -->
@@ -412,7 +406,6 @@
 				onfocus={handleFocus}
 				onblur={handleBlur}
 			/>
-
 		</div>
 
 		<!-- Action Buttons -->
@@ -432,9 +425,7 @@
 				<span class="button-text">{isLoading ? 'Generating...' : 'Summarize'}</span>
 			</button>
 			{#if showPrompt}
-				<button onclick={resetForm} class="btn btn-secondary">
-					🔄️Reset
-				</button>
+				<button onclick={resetForm} class="btn btn-secondary"> 🔄️Reset </button>
 			{/if}
 		</div>
 
@@ -450,7 +441,14 @@
 						class="btn btn-copy"
 						title="Copy to clipboard"
 					>
-						<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<svg
+							width="16"
+							height="16"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+						>
 							<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
 							<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
 						</svg>
@@ -460,68 +458,6 @@
 				<div class="prompt-content">
 					<pre>{aiResponse || generatedPrompt}</pre>
 				</div>
-				
-				<!-- Chat Interface for Follow-up Questions -->
-				{#if conversationId}
-					<div class="chat-section">
-						<div class="chat-header">
-							<h5>💬 Ask Follow-up Questions</h5>
-						</div>
-						
-						<div class="chat-messages">
-							{#each chatMessages.slice(2) as message}
-								<div class="chat-message {message.role}">
-									{#if message.role === 'user'}
-										<div class="message-label">You</div>
-									{:else if message.role === 'assistant'}
-										<div class="message-label">AI</div>
-									{:else}
-										<div class="message-label">Error</div>
-									{/if}
-									<div class="message-content">
-										<pre>{message.content}</pre>
-									</div>
-								</div>
-							{/each}
-							
-							{#if isSendingFollowUp}
-								<div class="chat-message assistant loading">
-									<div class="message-label">AI</div>
-									<div class="message-content">
-										<div class="typing-indicator">
-											<span></span>
-											<span></span>
-											<span></span>
-										</div>
-									</div>
-								</div>
-							{/if}
-						</div>
-						
-						<div class="chat-input-area">
-							<textarea
-								bind:value={followUpQuestion}
-								placeholder="Ask a follow-up question..."
-								class="chat-input"
-								rows="2"
-								maxlength="1000"
-								onkeydown={handleChatKeydown}
-								disabled={isSendingFollowUp}
-							></textarea>
-							<button 
-								onclick={sendFollowUp} 
-								disabled={!followUpQuestion.trim() || isSendingFollowUp}
-								class="btn btn-send"
-								title="Send message"
-							>
-								<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-									<line x1="22" y1="2" x2="11" y2="13"></line>
-									<polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-								</svg>
-							</button>
-						</div>
-					</div>
-				{/if}
 			</div>
 		{/if}
 	</div>
@@ -531,23 +467,16 @@
 	.ai-summarizer {
 		background: var(--bg-secondary);
 		border: 1px solid var(--border-color);
-		border-radius: var(--radius-lg);
-		padding: 1.5rem;
+		border-radius: 10px;
+		padding: 0.72rem;
 		height: fit-content;
-		margin-left: 1em;
+		margin-left: 0;
 	}
 
 	.summarizer-header {
-		margin-bottom: 1.5rem;
-		padding-bottom: 1rem;
+		margin-bottom: 1rem;
+		padding-bottom: 0.65rem;
 		border-bottom: 2px solid var(--border-color);
-	}
-
-	.summarizer-header h3 {
-		margin: 0 0 0.5rem 0;
-		font-size: 1.4rem;
-		color: var(--text-primary);
-		font-weight: 700;
 	}
 
 	.header-description {
@@ -559,35 +488,35 @@
 	.summarizer-form {
 		display: flex;
 		flex-direction: column;
-		gap: 1.5rem;
+		gap: 0.95rem;
 	}
 
 	.form-group {
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
+		gap: 0.35rem;
 	}
 
 	.form-group label {
-		font-size: 0.95rem;
+		font-size: 0.88rem;
 		font-weight: 600;
 		color: var(--text-primary);
 		letter-spacing: 0.02em;
 	}
-	
+
 	.text-label {
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
 	}
-	
+
 	.char-count {
-		font-size: 0.75rem;
+		font-size: 0.66rem;
 		color: var(--text-secondary);
 		font-weight: 400;
 		margin-left: auto;
 	}
-	
+
 	.error-banner {
 		width: 100%;
 		padding: 0.75rem 1rem;
@@ -602,20 +531,20 @@
 		font-size: 0.9rem;
 		animation: slideDown 0.3s ease-out;
 	}
-	
+
 	.error-list {
 		flex: 1;
 	}
-	
+
 	.error-list div {
 		margin: 0.25rem 0;
 	}
-	
+
 	.error-icon {
 		font-size: 1.2rem;
 		flex-shrink: 0;
 	}
-	
+
 	@keyframes slideDown {
 		from {
 			opacity: 0;
@@ -628,12 +557,12 @@
 	}
 
 	.select-input {
-		padding: 0.75rem;
+		padding: 0.6rem 0.68rem;
 		background: var(--bg-tertiary);
 		border: 1px solid var(--border-color);
 		border-radius: var(--radius-md);
 		color: var(--text-primary);
-		font-size: 0.95rem;
+		font-size: 0.88rem;
 		transition: all 0.2s ease;
 		cursor: pointer;
 	}
@@ -656,12 +585,12 @@
 
 	.text-input,
 	.textarea-input {
-		padding: 0.75rem;
+		padding: 0.6rem 0.68rem;
 		background: var(--bg-tertiary);
 		border: 1px solid var(--border-color);
 		border-radius: var(--radius-md);
 		color: var(--text-primary);
-		font-size: 0.95rem;
+		font-size: 0.88rem;
 		font-family: inherit;
 		transition: all 0.2s ease;
 		resize: vertical;
@@ -686,7 +615,7 @@
 	}
 
 	.checkbox-group {
-		padding: 0.75rem;
+		padding: 0.55rem 0.65rem;
 		background: rgba(0, 0, 0, 0.2);
 		border-radius: var(--radius-md);
 		border: 1px solid transparent;
@@ -701,12 +630,12 @@
 	.checkbox-label {
 		display: flex;
 		align-items: flex-start;
-		gap: 0.75rem;
+		gap: 0.55rem;
 		cursor: pointer;
 		user-select: none;
 	}
 
-	.checkbox-label input[type="checkbox"] {
+	.checkbox-label input[type='checkbox'] {
 		margin-top: 0.2rem;
 		width: 18px;
 		height: 18px;
@@ -722,20 +651,20 @@
 	}
 
 	.checkbox-title {
-		font-size: 0.95rem;
+		font-size: 0.86rem;
 		font-weight: 600;
 		color: var(--text-primary);
 	}
 
 	.checkbox-description {
-		font-size: 0.85rem;
+		font-size: 0.74rem;
 		color: var(--text-secondary);
 	}
 
 	.action-buttons {
 		display: flex;
 		gap: 0.75rem;
-		margin-top: 0.5rem;
+		margin-top: 0.25rem;
 	}
 
 	.btn {
@@ -743,10 +672,10 @@
 		align-items: center;
 		justify-content: center;
 		gap: 0.5rem;
-		padding: 0.875rem 1.5rem;
+		padding: 0.68rem 1rem;
 		border: none;
 		border-radius: var(--radius-md);
-		font-size: 1rem;
+		font-size: 0.9rem;
 		font-weight: 600;
 		cursor: pointer;
 		transition: all 0.2s ease;
@@ -809,7 +738,7 @@
 		border-radius: 50%;
 		animation: spin 0.8s linear infinite;
 	}
-	
+
 	.btn-primary :global(.spinner.visible) {
 		display: inline-block;
 	}
@@ -878,27 +807,27 @@
 		border: 1px solid var(--border-color);
 		border-radius: var(--radius-md);
 		overflow: hidden;
-		margin-top: 0.5rem;
+		margin-top: 0.3rem;
 	}
 
 	.prompt-header {
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		padding: 1rem;
+		padding: 0.65rem 0.75rem;
 		background: rgba(0, 0, 0, 0.2);
 		border-bottom: 1px solid var(--border-color);
 	}
 
 	.prompt-header h4 {
 		margin: 0;
-		font-size: 1rem;
+		font-size: 0.88rem;
 		color: var(--text-primary);
 		font-weight: 600;
 	}
 
 	.prompt-content {
-		padding: 1rem;
+		padding: 0.75rem;
 		max-height: 400px;
 		overflow-y: auto;
 	}
@@ -906,8 +835,8 @@
 	.prompt-content pre {
 		margin: 0;
 		font-family: 'Courier New', Courier, monospace;
-		font-size: 0.9rem;
-		line-height: 1.6;
+		font-size: 0.82rem;
+		line-height: 1.5;
 		color: var(--text-primary);
 		white-space: pre-wrap;
 		word-wrap: break-word;
@@ -934,9 +863,9 @@
 
 	/* Chat Section Styles */
 	.chat-section {
-		margin-top: 1rem;
+		margin-top: 0.75rem;
 		border-top: 1px solid var(--border-color);
-		padding-top: 1rem;
+		padding-top: 0.75rem;
 	}
 
 	.chat-header {
@@ -945,7 +874,7 @@
 
 	.chat-header h5 {
 		margin: 0;
-		font-size: 0.95rem;
+		font-size: 0.82rem;
 		color: var(--text-primary);
 		font-weight: 600;
 	}
@@ -955,12 +884,12 @@
 		overflow-y: auto;
 		display: flex;
 		flex-direction: column;
-		gap: 0.75rem;
-		padding: 0.5rem 0;
+		gap: 0.55rem;
+		padding: 0.35rem 0;
 	}
 
 	.chat-message {
-		padding: 0.75rem;
+		padding: 0.58rem;
 		border-radius: var(--radius-md);
 		animation: fadeIn 0.3s ease-out;
 	}
@@ -981,7 +910,7 @@
 	}
 
 	.message-label {
-		font-size: 0.75rem;
+		font-size: 0.68rem;
 		font-weight: 600;
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
@@ -990,7 +919,7 @@
 	}
 
 	.message-content {
-		font-size: 0.9rem;
+		font-size: 0.82rem;
 		color: var(--text-primary);
 	}
 
@@ -1025,7 +954,9 @@
 	}
 
 	@keyframes bounce {
-		0%, 80%, 100% {
+		0%,
+		80%,
+		100% {
 			transform: scale(0);
 		}
 		40% {
@@ -1053,12 +984,12 @@
 
 	.chat-input {
 		flex: 1;
-		padding: 0.75rem;
+		padding: 0.62rem;
 		background: var(--bg-primary);
 		border: 1px solid var(--border-color);
 		border-radius: var(--radius-md);
 		color: var(--text-primary);
-		font-size: 0.9rem;
+		font-size: 0.82rem;
 		resize: none;
 		transition: border-color 0.2s;
 	}
@@ -1074,7 +1005,7 @@
 	}
 
 	.btn-send {
-		padding: 0.75rem;
+		padding: 0.62rem;
 		background: var(--accent);
 		color: white;
 		border: none;

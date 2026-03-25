@@ -3,60 +3,88 @@
 	import FilterPanel from '$lib/Components/FilterPanel.svelte';
 	import { apiUrl } from '$lib/config.js';
 	import { browser } from '$app/environment';
+	import posthog from 'posthog-js';
 
 	// Store the resolved bills data
 	let billsData = $state([]);
-	let searchQuery = $state('');
-	let statusFilter = $state('all');
-	let chamberFilter = $state('all');
-	let sponsorFilter = $state('');
-	let dateFrom = $state('');
-	let dateTo = $state('');
-	let itemsPerPage = $state(25);
+	let draftSearchQuery = $state('');
+	let draftStatusFilter = $state('all');
+	let draftChamberFilter = $state('all');
+	let draftSponsorFilter = $state('');
+	let draftDateFrom = $state('');
+	let draftDateTo = $state('');
+	let draftItemsPerPage = $state(25);
+
+	let appliedSearchQuery = $state('');
+	let appliedStatusFilter = $state('all');
+	let appliedChamberFilter = $state('all');
+	let appliedSponsorFilter = $state('');
+	let appliedDateFrom = $state('');
+	let appliedDateTo = $state('');
+	let appliedItemsPerPage = $state(25);
 	let currentPage = $state(1);
 	let showFilters = $state(false);
 	let isSearching = $state(false);
 	let serverSearchResults = $state([]);
 	let hasSearched = $state(false);
-	let searchCongress = $state(false);
-	let shouldShowCongressPrompt = $state(false);
+	let streamPhase = $state('idle');
+	let streamLocalCount = $state(0);
+	let streamCongressCount = $state(0);
 	let isLoading = $state(false);
 	let error = $state(null);
 
 	export const snapshot = {
 		capture: () => ({
 			billsData,
-			searchQuery,
-			statusFilter,
-			chamberFilter,
-			sponsorFilter,
-			dateFrom,
-			dateTo,
-			itemsPerPage,
+			draftSearchQuery,
+			draftStatusFilter,
+			draftChamberFilter,
+			draftSponsorFilter,
+			draftDateFrom,
+			draftDateTo,
+			draftItemsPerPage,
+			appliedSearchQuery,
+			appliedStatusFilter,
+			appliedChamberFilter,
+			appliedSponsorFilter,
+			appliedDateFrom,
+			appliedDateTo,
+			appliedItemsPerPage,
 			currentPage,
 			showFilters,
 			isSearching,
 			serverSearchResults,
 			hasSearched,
-			searchCongress,
+			streamPhase,
+			streamLocalCount,
+			streamCongressCount,
 			isLoading,
 			error
 		}),
 		restore: (value) => {
 			billsData = value.billsData;
-			searchQuery = value.searchQuery;
-			statusFilter = value.statusFilter;
-			chamberFilter = value.chamberFilter;
-			sponsorFilter = value.sponsorFilter;
-			dateFrom = value.dateFrom;
-			dateTo = value.dateTo;
-			itemsPerPage = value.itemsPerPage;
+			draftSearchQuery = value.draftSearchQuery;
+			draftStatusFilter = value.draftStatusFilter;
+			draftChamberFilter = value.draftChamberFilter;
+			draftSponsorFilter = value.draftSponsorFilter;
+			draftDateFrom = value.draftDateFrom;
+			draftDateTo = value.draftDateTo;
+			draftItemsPerPage = value.draftItemsPerPage;
+			appliedSearchQuery = value.appliedSearchQuery;
+			appliedStatusFilter = value.appliedStatusFilter;
+			appliedChamberFilter = value.appliedChamberFilter;
+			appliedSponsorFilter = value.appliedSponsorFilter;
+			appliedDateFrom = value.appliedDateFrom;
+			appliedDateTo = value.appliedDateTo;
+			appliedItemsPerPage = value.appliedItemsPerPage;
 			currentPage = value.currentPage;
 			showFilters = value.showFilters;
 			isSearching = value.isSearching;
 			serverSearchResults = value.serverSearchResults;
 			hasSearched = value.hasSearched;
-			searchCongress = value.searchCongress;
+			streamPhase = value.streamPhase;
+			streamLocalCount = value.streamLocalCount;
+			streamCongressCount = value.streamCongressCount;
 			// Don't restore loading/error states - let fresh fetch handle them
 			// isLoading = value.isLoading;
 			// error = value.error;
@@ -78,11 +106,19 @@
 			console.log('First bill sample:', bills[0]);
 			billsData = bills;
 			isLoading = false;
-			console.log('State updated - isLoading:', isLoading, 'error:', error, 'billsData.length:', billsData.length);
+			console.log(
+				'State updated - isLoading:',
+				isLoading,
+				'error:',
+				error,
+				'billsData.length:',
+				billsData.length
+			);
 		} catch (err) {
 			console.error('Error fetching bills:', err);
 			error = err.message;
 			isLoading = false;
+			posthog.capture('bills_load_error', { error_message: err.message });
 		}
 	}
 
@@ -102,11 +138,11 @@
 		}
 
 		if (!billsData || billsData.length === 0) return [];
-		
+
 		return billsData.filter((bill) => {
 			// Search filter
-			if (searchQuery) {
-				const query = searchQuery.toLowerCase();
+			if (appliedSearchQuery) {
+				const query = appliedSearchQuery.toLowerCase();
 				const matchesSearch =
 					bill.title?.toLowerCase().includes(query) ||
 					bill.billNumber?.toLowerCase().includes(query) ||
@@ -115,30 +151,33 @@
 			}
 
 			// Status filter
-			if (statusFilter !== 'all' && bill.status !== statusFilter) {
+			if (appliedStatusFilter !== 'all' && bill.status !== appliedStatusFilter) {
 				return false;
 			}
 
 			// Chamber filter
-			if (chamberFilter !== 'all' && bill.originChamber !== chamberFilter) {
+			if (appliedChamberFilter !== 'all' && bill.originChamber !== appliedChamberFilter) {
 				return false;
 			}
 
 			// Sponsor filter
-			if (sponsorFilter) {
-				const sponsorQuery = sponsorFilter.toLowerCase();
+			if (appliedSponsorFilter) {
+				const sponsorQuery = appliedSponsorFilter.toLowerCase();
 				const sponsorsArray = Array.isArray(bill.sponsors) ? bill.sponsors : [];
-				const sponsorStr = sponsorsArray.map(s => s ? `${s.firstName || ''} ${s.lastName || ''} ${s.fullName || ''}` : '').join(' ').toLowerCase();
+				const sponsorStr = sponsorsArray
+					.map((s) => (s ? `${s.firstName || ''} ${s.lastName || ''} ${s.fullName || ''}` : ''))
+					.join(' ')
+					.toLowerCase();
 				if (!sponsorStr.includes(sponsorQuery)) {
 					return false;
 				}
 			}
 
 			// Date range filter
-			if (dateFrom && bill.updateDate < dateFrom) {
+			if (appliedDateFrom && bill.updateDate < appliedDateFrom) {
 				return false;
 			}
-			if (dateTo && bill.updateDate > dateTo) {
+			if (appliedDateTo && bill.updateDate > appliedDateTo) {
 				return false;
 			}
 
@@ -150,40 +189,22 @@
 	let paginatedBills = $derived(() => {
 		const filtered = filteredBills();
 		if (!filtered) return [];
-		const startIndex = (currentPage - 1) * itemsPerPage;
-		const endIndex = startIndex + itemsPerPage;
+		const startIndex = (currentPage - 1) * appliedItemsPerPage;
+		const endIndex = startIndex + appliedItemsPerPage;
 		return filtered.slice(startIndex, endIndex);
 	});
 
-	let totalPages = $derived(Math.ceil((filteredBills()?.length || 0) / itemsPerPage));
-
-	// Check if we should show Congress search prompt
-	$effect(() => {
-		const filtered = filteredBills();
-		if (filtered && filtered.length < 10 && filtered.length > 0 && !isSearching && !hasSearched && !serverSearchResults.length) {
-			shouldShowCongressPrompt = true;
-		} else {
-			shouldShowCongressPrompt = false;
-		}
-	});
-
-	// Auto-search Congress if checkbox is enabled and results are low
-	$effect(() => {
-		const filtered = filteredBills();
-		if (searchCongress && filtered && filtered.length < 10 && !isSearching && !hasSearched && !serverSearchResults.length) {
-			searchOnServer();
-		}
-	});
+	let totalPages = $derived(Math.ceil((filteredBills()?.length || 0) / appliedItemsPerPage));
 
 	// Reset to page 1 when filters change
 	$effect(() => {
-		searchQuery;
-		statusFilter;
-		chamberFilter;
-		sponsorFilter;
-		dateFrom;
-		dateTo;
-		itemsPerPage;
+		appliedSearchQuery;
+		appliedStatusFilter;
+		appliedChamberFilter;
+		appliedSponsorFilter;
+		appliedDateFrom;
+		appliedDateTo;
+		appliedItemsPerPage;
 		currentPage = 1;
 	});
 
@@ -199,54 +220,94 @@
 	}
 
 	async function searchOnServer() {
+		posthog.capture('congress_search_initiated', {
+			search_query: appliedSearchQuery,
+			status_filter: appliedStatusFilter,
+			chamber_filter: appliedChamberFilter,
+			sponsor_filter: appliedSponsorFilter,
+			date_from: appliedDateFrom,
+			date_to: appliedDateTo
+		});
 		isSearching = true;
 		hasSearched = false;
 		serverSearchResults = [];
+		streamPhase = 'local';
+		streamLocalCount = 0;
+		streamCongressCount = 0;
 		currentPage = 1;
 
 		try {
 			const params = new URLSearchParams();
-			
-			if (searchQuery) params.append('search', searchQuery);
-			if (statusFilter !== 'all') params.append('status', statusFilter);
-			if (chamberFilter !== 'all') params.append('chamber', chamberFilter);
-			if (sponsorFilter) params.append('sponsor', sponsorFilter);
-			if (dateFrom) params.append('dateFrom', dateFrom);
-			if (dateTo) params.append('dateTo', dateTo);
+
+			if (appliedSearchQuery) params.append('search', appliedSearchQuery);
+			if (appliedStatusFilter !== 'all') params.append('status', appliedStatusFilter);
+			if (appliedChamberFilter !== 'all') params.append('chamber', appliedChamberFilter);
+			if (appliedSponsorFilter) params.append('sponsor', appliedSponsorFilter);
+			if (appliedDateFrom) params.append('dateFrom', appliedDateFrom);
+			if (appliedDateTo) params.append('dateTo', appliedDateTo);
 			params.append('stream', 'true');
 
 			const response = await fetch(apiUrl(`/api/search-bills?${params.toString()}`));
-			
+
 			console.log('Response status:', response.status);
 			console.log('Response headers:', response.headers.get('Content-Type'));
-			
+
 			if (response.ok && response.body) {
 				const reader = response.body.getReader();
 				const decoder = new TextDecoder();
 				let buffer = '';
+				const seen = new Set();
 
 				try {
 					while (true) {
 						const { done, value } = await reader.read();
-						
+
 						if (done) {
 							console.log('Stream completed');
 							break;
 						}
-						
+
 						buffer += decoder.decode(value, { stream: true });
 						const lines = buffer.split('\n');
-						
+
 						// Keep the last incomplete line in the buffer
 						buffer = lines.pop() || '';
-						
+
 						// Process complete lines
 						for (const line of lines) {
 							if (line.trim()) {
 								try {
-									const bill = JSON.parse(line);
+									const payload = JSON.parse(line);
+
+									if (payload?.type === 'event') {
+										if (payload.phase === 'local' && payload.status === 'start') {
+											streamPhase = 'local';
+										} else if (payload.phase === 'congress' && payload.status === 'start') {
+											streamPhase = 'congress';
+										} else if (payload.phase === 'all' && payload.status === 'complete') {
+											streamPhase = 'complete';
+										}
+										continue;
+									}
+
+									const bill = payload?.type === 'bill' ? payload.bill : payload;
+									if (!bill || !bill.billNumber) {
+										continue;
+									}
+
+									const key = `${(bill.billNumber || '').toLowerCase()}|${bill.congress || ''}`;
+									if (seen.has(key)) {
+										continue;
+									}
+									seen.add(key);
+
+									if (payload?.source === 'local') {
+										streamLocalCount += 1;
+									} else if (payload?.source === 'congress') {
+										streamCongressCount += 1;
+									}
+
 									console.log('Received bill:', bill.billNumber);
-									// Create a new array to trigger reactivity
 									serverSearchResults = [...serverSearchResults, bill];
 								} catch (e) {
 									console.error('Error parsing bill:', e, 'Line:', line);
@@ -257,8 +318,11 @@
 				} catch (streamError) {
 					console.error('Stream reading error:', streamError);
 				}
-				
+
 				hasSearched = true;
+				if (streamPhase !== 'complete') {
+					streamPhase = 'complete';
+				}
 			} else {
 				console.error('Response not ok or no body');
 			}
@@ -270,12 +334,54 @@
 		}
 	}
 
+	function handleLiveSearchSubmit(event) {
+		event.preventDefault();
+		handleApplyFilters();
+	}
+
+	function handleApplyFilters() {
+		appliedSearchQuery = draftSearchQuery.trim();
+		appliedStatusFilter = draftStatusFilter;
+		appliedChamberFilter = draftChamberFilter;
+		appliedSponsorFilter = draftSponsorFilter.trim();
+		appliedDateFrom = draftDateFrom;
+		appliedDateTo = draftDateTo;
+		appliedItemsPerPage = Number(draftItemsPerPage) || 25;
+
+		resetServerSearch();
+
+		if (!appliedSearchQuery) {
+			return;
+		}
+
+		searchOnServer();
+	}
+
 	function resetServerSearch() {
 		serverSearchResults = [];
 		hasSearched = false;
+		streamPhase = 'idle';
+		streamLocalCount = 0;
+		streamCongressCount = 0;
 	}
 
 	function handleFilterReset() {
+		draftSearchQuery = '';
+		draftStatusFilter = 'all';
+		draftChamberFilter = 'all';
+		draftSponsorFilter = '';
+		draftDateFrom = '';
+		draftDateTo = '';
+		draftItemsPerPage = 25;
+
+		appliedSearchQuery = '';
+		appliedStatusFilter = 'all';
+		appliedChamberFilter = 'all';
+		appliedSponsorFilter = '';
+		appliedDateFrom = '';
+		appliedDateTo = '';
+		appliedItemsPerPage = 25;
+
 		resetServerSearch();
 	}
 </script>
@@ -287,11 +393,49 @@
 	</div>
 
 	<section class="recent-bills-section">
+		<form class="live-search" onsubmit={handleLiveSearchSubmit}>
+			<input
+				type="search"
+				bind:value={draftSearchQuery}
+				placeholder="Search bills: local database first, then Congress.gov"
+				aria-label="Search bills"
+			/>
+			<button type="submit" class="live-search-button" disabled={isSearching}>
+				{#if isSearching}
+					<span class="spinner-inline"></span>
+					Searching...
+				{:else}
+					Search
+				{/if}
+			</button>
+			<button type="button" class="live-clear-button" onclick={resetServerSearch}> Clear </button>
+		</form>
+
+		{#if streamPhase !== 'idle' || hasSearched}
+			<p class="stream-status">
+				{#if isSearching && streamPhase === 'local'}
+					Searching local database first...
+				{:else if isSearching && streamPhase === 'congress'}
+					Searching Congress.gov and streaming matches...
+				{:else}
+					Search complete.
+				{/if}
+				<span> Local: {streamLocalCount} | Congress: {streamCongressCount} </span>
+			</p>
+		{/if}
+
 		<!-- Mobile Filter Toggle -->
 		<div class="filter-header-mobile">
 			<h3>Recently Updated Bills</h3>
 			<button class="filter-toggle" onclick={toggleFilters} aria-label="Toggle filters">
-				<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<svg
+					width="24"
+					height="24"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+				>
 					<line x1="4" y1="6" x2="20" y2="6"></line>
 					<line x1="4" y1="12" x2="20" y2="12"></line>
 					<line x1="4" y1="18" x2="20" y2="18"></line>
@@ -305,7 +449,14 @@
 			<div class="header-row">
 				<h3>Recently Updated Bills</h3>
 				<button class="filter-toggle" onclick={toggleFilters} aria-label="Toggle filters">
-					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<svg
+						width="24"
+						height="24"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
 						<line x1="4" y1="6" x2="20" y2="6"></line>
 						<line x1="4" y1="12" x2="20" y2="12"></line>
 						<line x1="4" y1="18" x2="20" y2="18"></line>
@@ -313,7 +464,7 @@
 					Filters {showFilters ? '▲' : '▼'}
 				</button>
 			</div>
-			<br>
+			<br />
 		</div>
 
 		{#if isLoading}
@@ -323,13 +474,13 @@
 				<p>Loading bills...</p>
 			</div>
 		{:else if error}
-		<!-- Error state -->
-		<div class="error-message">
-			<p>Error loading bills: {error}</p>
-		</div>
-	{:else}
-		<!-- Success state -->
-		{#if !billsData || billsData.length === 0}
+			<!-- Error state -->
+			<div class="error-message">
+				<p>Error loading bills: {error}</p>
+			</div>
+		{:else}
+			<!-- Success state -->
+			{#if !billsData || billsData.length === 0}
 				<div class="empty-message">
 					<p>No bills found in the database.</p>
 				</div>
@@ -337,20 +488,20 @@
 				<!-- Filter Panel -->
 				<div class="filter-container" class:hidden={!showFilters}>
 					<FilterPanel
-						bind:searchQuery
-						bind:statusFilter
-						bind:chamberFilter
-						bind:sponsorFilter
-						bind:dateFrom
-						bind:dateTo
-						bind:itemsPerPage
-						bind:searchCongress
-						resultsSummary="Showing {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, filteredBills().length)} of {filteredBills().length} bills"
+						bind:statusFilter={draftStatusFilter}
+						bind:chamberFilter={draftChamberFilter}
+						bind:sponsorFilter={draftSponsorFilter}
+						bind:dateFrom={draftDateFrom}
+						bind:dateTo={draftDateTo}
+						bind:itemsPerPage={draftItemsPerPage}
+						resultsSummary="Showing {(currentPage - 1) * appliedItemsPerPage + 1}-{Math.min(
+							currentPage * appliedItemsPerPage,
+							filteredBills().length
+						)} of {filteredBills().length} bills"
 						onReset={handleFilterReset}
-					onSearchCongress={searchOnServer}
-				/>
-			</div>
-
+						onApply={handleApplyFilters}
+					/>
+				</div>
 
 				<!-- Bills Grid -->
 				{#if isSearching && serverSearchResults.length === 0}
@@ -361,7 +512,7 @@
 				{:else if paginatedBills().length === 0 && !isSearching}
 					<div class="empty-message">
 						{#if hasSearched}
-							<p>No bills found on Congress.gov matching your filters.</p>
+							<p>No matching bills found in local storage or Congress.gov.</p>
 							<button class="reset-search-button" onclick={resetServerSearch}>
 								Back to Local Results
 							</button>
@@ -375,7 +526,7 @@
 							<Bill {bill} />
 						{/each}
 					</div>
-					
+
 					{#if isSearching}
 						<div class="loading-footer">
 							<div class="spinner-small"></div>
@@ -464,6 +615,64 @@
 
 	.recent-bills-section {
 		margin-top: 2rem;
+	}
+
+	.live-search {
+		display: grid;
+		grid-template-columns: 1fr auto auto;
+		gap: 0.6rem;
+		align-items: center;
+		margin-bottom: 1rem;
+	}
+
+	.live-search input {
+		padding: 0.78rem 0.95rem;
+		border-radius: var(--radius-md);
+		border: 1px solid var(--border-color);
+		background: var(--bg-secondary);
+		color: var(--text-primary);
+		font-size: 0.96rem;
+	}
+
+	.live-search input:focus {
+		outline: none;
+		border-color: var(--accent);
+		box-shadow: 0 0 0 3px rgba(241, 58, 55, 0.14);
+	}
+
+	.live-search-button,
+	.live-clear-button {
+		padding: 0.75rem 1rem;
+		border-radius: var(--radius-md);
+		border: 1px solid var(--border-color);
+		cursor: pointer;
+		font-weight: 600;
+	}
+
+	.live-search-button {
+		background: var(--accent);
+		border-color: var(--accent);
+		color: #fff;
+	}
+
+	.live-search-button:disabled {
+		opacity: 0.7;
+		cursor: not-allowed;
+	}
+
+	.live-clear-button {
+		background: var(--bg-secondary);
+		color: var(--text-primary);
+	}
+
+	.stream-status {
+		margin: 0 0 1rem;
+		font-size: 0.9rem;
+		color: var(--text-secondary);
+		display: flex;
+		justify-content: space-between;
+		gap: 0.75rem;
+		flex-wrap: wrap;
 	}
 
 	.filter-header-mobile {
@@ -706,6 +915,10 @@
 			display: flex;
 		}
 
+		.live-search {
+			grid-template-columns: 1fr;
+		}
+
 		.filter-header-desktop {
 			display: none;
 		}
@@ -768,4 +981,3 @@
 		}
 	}
 </style>
-

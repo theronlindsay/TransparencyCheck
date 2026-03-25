@@ -21,6 +21,7 @@ OPENAI_API_KEY=
 # --- Local Database Configuration ---
 MONGO_ROOT_USER=admin
 MONGO_ROOT_PASSWORD=password123
+DATABASE_URL=mongodb://admin:password123@mongodb:27017/transparency_check?authSource=admin
 
 # --- Networking ---
 # Leave VITE_API_BASE_URL empty for Docker/Nginx environments to use relative paths
