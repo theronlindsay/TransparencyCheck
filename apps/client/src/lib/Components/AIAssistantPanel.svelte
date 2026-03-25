@@ -27,9 +27,11 @@
 	let inputMessage = $state('');
 	let isSending = $state(false);
 	let conversationId = $state(null);
-	let showSummarizerCard = $state(false);
+	let hasSummarizedBill = $state(false);
+	let showSummarizerConfigurator = $state(false);
 	let lastContextKey = $state('');
 	const MAX_BILL_TEXT_CONTEXT_CHARS = 12000;
+	const DEFAULT_TOOLS = [{ type: 'web_search_preview' }];
 
 	const canSuggestSummarizer = $derived(
 		context.pageType === 'bill' &&
@@ -42,11 +44,27 @@
 	}
 
 	function handleSummarizerSuggestion() {
-		if (showSummarizerCard) return;
-		showSummarizerCard = true;
-		addMessage({
-			role: 'assistant',
-			type: 'summarizer-card'
+		if (showSummarizerConfigurator) return;
+		showSummarizerConfigurator = true;
+	}
+
+	async function handleSummarizerReady(result) {
+		showSummarizerConfigurator = false;
+		hasSummarizedBill = true;
+
+		const prompt = result?.prompt?.trim();
+		if (!prompt) {
+			addMessage({
+				role: 'assistant',
+				type: 'text',
+				content: 'I could not build a summary prompt. Please try again.'
+			});
+			return;
+		}
+
+		await submitQuestion(prompt, {
+			displayQuestion: result?.userMessage || 'Summarize this bill with the selected options.',
+			tools: result?.enableWebSearch ? [{ type: 'web_search_preview' }] : undefined
 		});
 	}
 
@@ -79,25 +97,33 @@
 			.join('\n\n');
 	}
 
-	async function sendMessage(event) {
-		event?.preventDefault();
-		if (!inputMessage.trim() || isSending) return;
+	async function submitQuestion(question, options = {}) {
+		if (!question?.trim() || isSending) return;
 
-		const question = inputMessage.trim();
-		inputMessage = '';
+		const {
+			displayQuestion = question,
+			tools = DEFAULT_TOOLS
+		} = options;
+
 		isSending = true;
 
-		addMessage({ role: 'user', type: 'text', content: question });
+		addMessage({ role: 'user', type: 'text', content: displayQuestion });
 
 		try {
+			const requestBody = {
+				prompt: buildContextPrompt(question),
+				conversationId
+			};
+
+			const mergedTools = Array.isArray(tools)
+				? [...DEFAULT_TOOLS, ...tools.filter((tool) => tool?.type !== 'web_search_preview')]
+				: DEFAULT_TOOLS;
+			requestBody.tools = mergedTools;
+
 			const response = await fetch(apiUrl('/api/openAI'), {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					prompt: buildContextPrompt(question),
-					tools: [{ type: 'web_search_preview' }],
-					conversationId
-				})
+				body: JSON.stringify(requestBody)
 			});
 			const data = await response.json();
 
@@ -122,6 +148,15 @@
 		}
 	}
 
+	async function sendMessage(event) {
+		event?.preventDefault();
+		if (!inputMessage.trim() || isSending) return;
+
+		const question = inputMessage.trim();
+		inputMessage = '';
+		await submitQuestion(question);
+	}
+
 	function handleInputKeydown(event) {
 		if (event.key === 'Enter' && !event.shiftKey) {
 			event.preventDefault();
@@ -143,7 +178,8 @@
 			messages = [getIntroMessage(context.pageLabel || 'this page')];
 			inputMessage = '';
 			conversationId = null;
-			showSummarizerCard = false;
+			hasSummarizedBill = false;
+			showSummarizerConfigurator = false;
 			isSending = false;
 			lastContextKey = contextKey;
 		}
@@ -162,28 +198,29 @@
 
 		<div class="messages">
 			{#each messages as message (message.id)}
-				<div class={`message ${message.role} ${message.type === 'summarizer-card' ? 'card' : ''}`}>
-					{#if message.type === 'summarizer-card'}
-						<p>{message.content}</p>
-						<div class="summarizer-card">
-							<AISummarizer
-								billNumber={context.data?.billNumber || ''}
-								billTitle={context.data?.billTitle || ''}
-								billText={context.data?.billText || ''}
-							/>
-						</div>
-					{:else}
-						<p>{message.content}</p>
-					{/if}
+				<div class={`message ${message.role}`}>
+					<p>{message.content}</p>
 				</div>
 			{/each}
 		</div>
 
 		<div class="input-area">
-			{#if canSuggestSummarizer && !showSummarizerCard}
+			{#if canSuggestSummarizer && !hasSummarizedBill && !showSummarizerConfigurator}
 				<button class="suggestion" type="button" onclick={handleSummarizerSuggestion}>
 					✨ Summarize this bill
 				</button>
+			{/if}
+
+			{#if canSuggestSummarizer && showSummarizerConfigurator}
+				<div class="summarizer-card-window">
+					<AISummarizer
+						billNumber={context.data?.billNumber || ''}
+						billTitle={context.data?.billTitle || ''}
+						billText={context.data?.billText || ''}
+						embedded={true}
+						onSummaryReady={handleSummarizerReady}
+					/>
+				</div>
 			{/if}
 
 			<form class="chat-form" onsubmit={sendMessage}>
@@ -209,8 +246,8 @@
 		width: min(430px, calc(100vw - 2rem));
 		height: min(72vh, 760px);
 		display: grid;
-		grid-template-rows: auto 1fr auto;
-		background: linear-gradient(160deg, rgba(29, 25, 25, 0.96), rgba(18, 15, 15, 0.94));
+		grid-template-rows: auto minmax(0, 1fr) auto;
+		background: linear-gradient(160deg, rgba(18, 20, 24, 0.99), rgba(12, 14, 18, 0.99));
 		border: 1px solid rgba(255, 255, 255, 0.1);
 		border-radius: 20px;
 		z-index: 129;
@@ -219,6 +256,20 @@
 			0 38px 72px rgba(0, 0, 0, 0.24),
 			inset 0 1px 0 rgba(255, 255, 255, 0.12);
 		overflow: hidden;
+		isolation: isolate;
+	}
+
+	.assistant-panel::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		background: linear-gradient(160deg, rgba(18, 20, 24, 0.985), rgba(12, 14, 18, 0.985));
+		z-index: 0;
+	}
+
+	.assistant-panel > * {
+		position: relative;
+		z-index: 1;
 	}
 
 	.panel-header {
@@ -257,11 +308,15 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.8rem;
+		min-height: 0;
+		overscroll-behavior: contain;
 	}
 
 	.message {
 		align-self: flex-start;
-		width: fit-content;
+		display: block;
+		flex: 0 0 auto;
+		width: auto;
 		max-width: 92%;
 		height: auto;
 		min-height: 0;
@@ -269,39 +324,29 @@
 		border-radius: 13px;
 		font-size: 0.92rem;
 		line-height: 1.45;
-	}
-
-	.message.card {
-		width: 100%;
-		max-width: 100%;
+		box-sizing: border-box;
 	}
 
 	.message p {
 		margin: 0;
+		display: block;
 		color: inherit;
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+		word-break: break-word;
 	}
 
 	.message.assistant {
-		background: rgba(255, 255, 255, 0.05);
+		background: rgba(28, 32, 40, 0.94);
 		border: 1px solid rgba(255, 255, 255, 0.08);
 		color: var(--text-primary);
 	}
 
 	.message.user {
-		background: rgba(241, 58, 55, 0.2);
+		background: rgba(120, 23, 22, 0.94);
 		border: 1px solid rgba(241, 58, 55, 0.35);
 		color: #ffe6e5;
 		align-self: flex-end;
-	}
-
-	.summarizer-card {
-		margin-top: 0.55rem;
-		padding: 0;
-		border-radius: 8px;
-		background: transparent;
-		border: none;
-		max-height: 440px;
-		overflow: auto;
 	}
 
 	.input-area {
@@ -309,6 +354,7 @@
 		border-top: 1px solid rgba(255, 255, 255, 0.08);
 		display: grid;
 		gap: 0.55rem;
+		background: rgba(10, 12, 16, 0.97);
 	}
 
 	.suggestion {
@@ -320,6 +366,15 @@
 		color: #ffd8d7;
 		font-weight: 700;
 		cursor: pointer;
+	}
+
+	.summarizer-card-window {
+		max-height: 52vh;
+		overflow: auto;
+		padding: 0.35rem;
+		border: 1px solid rgba(255, 255, 255, 0.09);
+		border-radius: 12px;
+		background: rgba(255, 255, 255, 0.02);
 	}
 
 	.chat-form {

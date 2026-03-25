@@ -3,7 +3,13 @@
 	import { apiUrl } from '$lib/config.js';
 	import posthog from 'posthog-js';
 
-	let { billNumber, billTitle, billText = '' } = $props();
+	let {
+		billNumber,
+		billTitle,
+		billText = '',
+		embedded = false,
+		onSummaryReady = () => {}
+	} = $props();
 
 	// State for all options $state allows any reference to the variable in the UI to dynamically update whenever the variable changes.
 	let readingLevel = $state('general');
@@ -44,7 +50,7 @@
 			form.classList.add('processing');
 		}
 
-		let prompt = `Please summarize bill ${billNumber}\n\n`;
+		let prompt = `Please summarize bill ${billNumber}${billTitle ? ` (${billTitle})` : ''}\n\n`;
 
 		prompt += `Follow these parameters in your summary:\n\n`;
 
@@ -101,6 +107,15 @@
 		}
 
 		generatedPrompt = prompt;
+
+		if (embedded) {
+			onSummaryReady({
+				prompt,
+				enableWebSearch,
+				userMessage: 'Summarize this bill with the selected options.'
+			});
+			return;
+		}
 
 		// Call API endpoint to send prompt to Node Server
 		try {
@@ -178,7 +193,7 @@
 			});
 		} finally {
 			isLoading = false;
-			showPrompt = true;
+			showPrompt = embedded ? false : true;
 
 			// Hide spinner using classList
 			const spinner = document.querySelector('.btn-primary .spinner');
@@ -192,13 +207,15 @@
 				form.classList.remove('processing');
 			}
 
-			// Add success indicator to prompt display
-			setTimeout(() => {
-				const promptDisplay = document.querySelector('.prompt-display');
-				if (promptDisplay) {
-					promptDisplay.classList.add('visible');
-				}
-			}, 50);
+			// Add success indicator to prompt display for non-embedded mode only.
+			if (!embedded) {
+				setTimeout(() => {
+					const promptDisplay = document.querySelector('.prompt-display');
+					if (promptDisplay) {
+						promptDisplay.classList.add('visible');
+					}
+				}, 50);
+			}
 		}
 	}
 
@@ -283,13 +300,6 @@
 					chatContainer.scrollTop = chatContainer.scrollHeight;
 				}
 			}, 50);
-		}
-	}
-
-	function handleChatKeydown(event) {
-		if (event.key === 'Enter' && !event.shiftKey) {
-			event.preventDefault();
-			sendFollowUp();
 		}
 	}
 
@@ -414,7 +424,7 @@
 				<div class="error-banner">
 					<span class="error-icon">⚠️</span>
 					<div class="error-list">
-						{#each serverErrors as error}
+							{#each serverErrors as error, idx (idx)}
 							<div>{error}</div>
 						{/each}
 					</div>
@@ -424,13 +434,13 @@
 				<span class="spinner"></span>
 				<span class="button-text">{isLoading ? 'Generating...' : 'Summarize'}</span>
 			</button>
-			{#if showPrompt}
+			{#if showPrompt && !embedded}
 				<button onclick={resetForm} class="btn btn-secondary"> 🔄️Reset </button>
 			{/if}
 		</div>
 
 		<!-- Generated Prompt Display -->
-		{#if showPrompt}
+		{#if showPrompt && !embedded}
 			<div class="prompt-display">
 				<div class="prompt-header">
 					<h4>{aiResponse ? 'AI Summary' : 'Generated Prompt'}</h4>
