@@ -2,6 +2,38 @@ import { fetchAndStoreBills } from '$lib/bill-fetcher.js';
 import { getRecentBills } from '$lib/db/repository.js';
 
 const POLL_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
+const DEFAULT_ALLOWED_ORIGINS = [
+	'http://localhost:5173',
+	'http://127.0.0.1:5173',
+	'https://localhost',
+	'capacitor://localhost',
+	'http://localhost'
+];
+
+const configuredCorsOrigins = (process.env.CORS_ORIGINS || '')
+	.split(',')
+	.map((value) => value.trim())
+	.filter(Boolean);
+
+const ALLOWED_ORIGINS = new Set([...DEFAULT_ALLOWED_ORIGINS, ...configuredCorsOrigins]);
+
+function buildCorsHeaders(event) {
+	const origin = event.request.headers.get('origin');
+	if (!origin || !ALLOWED_ORIGINS.has(origin)) {
+		return null;
+	}
+
+	const requestHeaders = event.request.headers.get('access-control-request-headers');
+
+	return {
+		'Access-Control-Allow-Origin': origin,
+		'Access-Control-Allow-Credentials': 'true',
+		'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
+		'Access-Control-Allow-Headers':
+			requestHeaders || 'Content-Type, Authorization, X-Requested-With, Accept',
+		Vary: 'Origin'
+	};
+}
 
 async function refreshBills() {
 	console.log('🔄 Background: refreshing bills from Congress.gov...');
@@ -44,23 +76,23 @@ export async function handle({ event, resolve }) {
 	console.log('🪝 handle called:', event.request.method, event.url.pathname);
 	// Trigger bill sync on the first request (non-blocking).
 	initBillSync().catch((err) => console.error('❌ initBillSync failed:', err));
-	// Add CORS headers for cross-origin requests
+	const corsHeaders = buildCorsHeaders(event);
+
+	// Handle preflight for allowed origins.
 	if (event.request.method === 'OPTIONS') {
 		return new Response(null, {
-			headers: {
-				'Access-Control-Allow-Origin': '*',
-				'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
-				'Access-Control-Allow-Headers': 'Content-Type, Authorization'
-			}
+			status: 204,
+			headers: corsHeaders || {}
 		});
 	}
 
 	const response = await resolve(event);
 
-	// Add CORS headers to all responses
-	response.headers.set('Access-Control-Allow-Origin', '*');
-	response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-	response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+	if (corsHeaders) {
+		for (const [header, value] of Object.entries(corsHeaders)) {
+			response.headers.set(header, value);
+		}
+	}
 
 	return response;
 }

@@ -170,6 +170,40 @@ TransparencyCheck/
 - `/api/bills` — Returns bill data from SQLite
 - `/api/search-bills` — Full-text search across bills
 
+## Floating AI Assistant
+
+The client now uses a global floating AI assistant popup instead of the old bottom-nav AI tab.
+
+### Behavior
+
+- Floating circular launcher at bottom-left (above bottom nav).
+- Always route-aware via a shared assistant context registry.
+- Supports multiple page data sources through pluggable route registrations.
+- On bill pages, a `Summarize this bill` suggestion appears above the chat input.
+- Clicking that suggestion renders the existing bill summarizer layout as a card in chat.
+- Sending chat messages asks questions against the current page context.
+
+### Key Files
+
+- `apps/client/src/lib/Components/AIAssistant.svelte`
+- `apps/client/src/lib/Components/AIAssistantLauncher.svelte`
+- `apps/client/src/lib/Components/AIAssistantPanel.svelte`
+- `apps/client/src/lib/stores/assistant-context.js`
+
+### Route Context Registration Example
+
+Routes can register their own assistant data source:
+
+1. Register with `registerAssistantSource(sourceId, config)`
+2. Stream data with `updateAssistantSourceData(sourceId, data)`
+3. Cleanup with `unregisterAssistantSource(sourceId)`
+
+The bill route (`apps/client/src/routes/bill/[id]/+page.svelte`) is the first implementation.
+
+Additional implementation details are tracked in:
+
+- `.agents/references/AI_ASSISTANT_SUMMARIZER.md`
+
 ## Database
 
 Bills sync automatically via background process on homepage load (fetches 20 most recent bills). Schema includes:

@@ -1,11 +1,9 @@
 <script>
 	import { goto } from '$app/navigation';
+	import posthog from 'posthog-js';
 
 	// Props for bill data
-	let {
-		bill = {},
-		onclick = null
-	} = $props();
+	let { bill = {}, onclick = null } = $props();
 
 	// Computed properties for template usage to standardize differences between APIs
 	const id = $derived(bill.id || bill._id || '');
@@ -22,24 +20,24 @@
 	// Format sponsor display - show first sponsor's name and party
 	function formatSponsor(sponsors) {
 		if (!sponsors || sponsors.length === 0) return 'Unknown';
-		
+
 		const mainSponsor = sponsors[0];
 		const name = `${mainSponsor.firstName || ''} ${mainSponsor.lastName || ''}`.trim();
 		const party = mainSponsor.party ? ` [${mainSponsor.party}]` : '';
-		
+
 		return name + party;
 	}
 
 	// Extract text from latestAction object
 	function getLatestActionText(latestAction) {
 		if (!latestAction) return 'No recent action';
-		
+
 		// If it's already a string, return it
 		if (typeof latestAction === 'string') return latestAction;
-		
+
 		// If it's an object with text property, return that
 		if (latestAction.text) return latestAction.text;
-		
+
 		return 'No recent action';
 	}
 
@@ -58,6 +56,13 @@
 	}
 
 	function handleCardClick() {
+		posthog.capture('bill_viewed', {
+			bill_id: id,
+			bill_number: number,
+			bill_title: title,
+			bill_status: statusTag,
+			bill_committee: committee
+		});
 		if (onclick) {
 			onclick();
 		} else {
@@ -78,7 +83,6 @@
 		if (text.length <= maxLength) return text;
 		return text.slice(0, maxLength) + '...';
 	}
-
 </script>
 
 <div
@@ -90,7 +94,7 @@
 	onkeydown={handleKeydown}
 	role="button"
 	tabindex="0"
-> 
+>
 	<!-- Latest Action Overlay (shows on hover) -->
 	<div class="latest-action-overlay" class:visible={isHovered}>
 		<div class="overlay-content">
@@ -99,15 +103,14 @@
 		</div>
 	</div>
 
-	
-
-	<h3 class="bill-title" title={title}>
+	<h3 class="bill-title" {title}>
 		<div class="card-header">
 			<span class="bill-number">{number}</span>
 			{#if statusTag}
 				<span class="badge">{statusTag}</span>
 			{/if}
-		</div>{truncateTitle(title)}
+		</div>
+		{truncateTitle(title)}
 	</h3>
 
 	<div class="bill-details">
@@ -148,7 +151,9 @@
 	.bill-card:hover {
 		transform: translateY(-4px);
 		border-color: rgba(241, 58, 55, 0.3);
-		box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(241, 58, 55, 0.2);
+		box-shadow:
+			0 20px 40px rgba(0, 0, 0, 0.4),
+			0 0 0 1px rgba(241, 58, 55, 0.2);
 	}
 
 	.bill-card:focus {

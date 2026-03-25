@@ -1,9 +1,20 @@
 services:
   mongodb:
-    image: mongo:latest
+    image: mongo:8.2
+    restart: unless-stopped
     environment:
       - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER}
       - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD}
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --quiet --username ${MONGO_ROOT_USER} --password ${MONGO_ROOT_PASSWORD} --authenticationDatabase admin --eval 'db.runCommand({ ping: 1 })'"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
     ports:
       - "127.0.0.1:27017:27017" # Bound strictly to localhost to prevent external access
     volumes:
@@ -13,8 +24,10 @@ services:
     build:
       context: .
       dockerfile: docker/server/dockerfile
+    restart: unless-stopped
     depends_on:
-      - mongodb # Ensures the MongoDB container creates and mounts before Node boots
+      mongodb:
+        condition: service_healthy # Wait for MongoDB to be ready before server starts
     env_file:
       - .env
     environment:

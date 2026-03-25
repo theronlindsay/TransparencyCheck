@@ -8,7 +8,11 @@ const config = {
 		adapter: adapterStatic({
 			fallback: 'index.html',
 			strict: false
-		})
+		}),
+		// Required for PostHog session replay to work correctly with SSR
+		paths: {
+			relative: false
+		}
 	}
 };
 
