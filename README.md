@@ -4,7 +4,7 @@ Dashboard for tracking U.S. congressional legislation with AI-powered bill summa
 
 ## Architecture
 
-This is an **npm workspaces monorepo** with two applications:
+This is a **bun workspaces monorepo** with two applications:
 
 - **Client** (`apps/client/`) — Static PWA with offline support (SvelteKit + adapter-static)
 - **Server** (`apps/server/`) — Node.js API server with SQLite database (SvelteKit + adapter-node)
@@ -16,15 +16,13 @@ The client app can be deployed as:
 
 ## Prerequisites
 
-- Node.js 18+ (Node 22 recommended)
-- npm (bundled with Node)
+- Bun (includes a Node.js-compatible runtime)
 - Docker & Docker Compose (for containerized deployment)
 
 ## Installation
 
 ```bash
-npm install
-npm run install:all  # Installs dependencies for all workspace apps
+bun install
 ```
 
 The SQLite database (`apps/server/src/lib/db/transparency.sqlite`) is created automatically on first run. Bills are synced from Congress.gov when you visit the homepage.
@@ -44,10 +42,10 @@ OPENAI_API_KEY=your-key       # Required - OpenAI for bill summarization
 
 ```bash
 # Start client dev server (http://localhost:5173)
-npm run dev:client
+bun run dev:client
 
 # Start server dev server (http://localhost:3000)
-npm run dev:server
+bun run dev:server
 ```
 
 ## Production Build & Deployment
@@ -62,7 +60,7 @@ The easiest way to deploy is using Docker Compose, which runs both client and se
 ./generate-ssl-certs.sh   # Linux/Mac
 
 # Build and start containers
-docker-compose up -d
+docker compose up -d
 ```
 
 Access the app at:
@@ -78,18 +76,18 @@ See [README-SSL.md](README-SSL.md) for Let's Encrypt setup and production HTTPS 
 
 ```bash
 # Build both apps
-npm run build
+bun run build
 
 # Or build individually
-npm run build:client  # Output: apps/client/build/
-npm run build:server  # Output: apps/server/build/
+bun run build:client  # Output: apps/client/build/
+bun run build:server  # Output: apps/server/build/
 ```
 
 To run the server in production:
 
 ```bash
 cd apps/server
-npm run start  # Runs Node.js server on port 3000
+bun run start  # Runs the server on port 3000
 ```
 
 Serve the client static files (`apps/client/build/`) with Nginx or any static host.
@@ -100,9 +98,9 @@ Build the client as an Android APK:
 
 ```bash
 cd apps/client
-VITE_API_BASE_URL=https://your-api-domain.com npm run build
-npx cap sync android
-npx cap open android  # Opens in Android Studio
+VITE_API_BASE_URL=https://transparencycheck.app bun run build
+bunx cap sync android
+bunx cap open android  # Opens in Android Studio
 ```
 
 Set `VITE_API_BASE_URL` to your deployed API origin when building for Android.

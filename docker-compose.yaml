@@ -3,13 +3,13 @@ services:
     image: mongo:8.2
     restart: unless-stopped
     environment:
-      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER}
-      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD}
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER:-admin}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD:-password123}
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "mongosh --quiet --username ${MONGO_ROOT_USER} --password ${MONGO_ROOT_PASSWORD} --authenticationDatabase admin --eval 'db.runCommand({ ping: 1 })'"
+          "mongosh --quiet --username ${MONGO_ROOT_USER:-admin} --password ${MONGO_ROOT_PASSWORD:-password123} --authenticationDatabase admin --eval 'db.runCommand({ ping: 1 })'"
         ]
       interval: 10s
       timeout: 5s
@@ -33,7 +33,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - DATABASE_URL=mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongodb:27017/transparency_check?authSource=admin
+      - DATABASE_URL=mongodb://${MONGO_ROOT_USER:-admin}:${MONGO_ROOT_PASSWORD:-password123}@mongodb:27017/transparency_check?authSource=admin
     volumes:
       - pdf-cache:/app/.cache
     ports:

@@ -1,18 +1,14 @@
-FROM docker.io/library/node:22 AS build
+FROM docker.io/oven/bun:1 AS build
 
 WORKDIR /app
 
 # Copy root and app package files
-COPY package*.json ./
+COPY package.json bun.lock ./
 COPY apps/client/package.json ./apps/client/
 COPY apps/server/package.json ./apps/server/
 
-# Copy lock files if they exist
-COPY package-lock.json* ./
-RUN mkdir -p ./apps/client ./apps/server
-
 # Install all dependencies (workspace aware)
-RUN npm install
+RUN bun install --frozen-lockfile
 
 COPY . .
 
@@ -20,7 +16,7 @@ ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
 # Build client only
-RUN npm run build:client
+RUN bun run build:client
 
 FROM docker.io/library/nginx:alpine
 

@@ -1,50 +1,31 @@
-FROM docker.io/library/node:22 AS build
+FROM docker.io/oven/bun:1 AS build
 
 WORKDIR /app
 
 # Copy root and app package files
-COPY package*.json ./
+COPY package.json bun.lock ./
 COPY apps/server/package.json ./apps/server/
 COPY apps/client/package.json ./apps/client/
 
-# Copy lock files if they exist (for deterministic builds)
-COPY package-lock.json* ./
-RUN mkdir -p ./apps/server ./apps/client
-RUN if [ -f /app/package-lock.json ]; then \
-      cp /app/package-lock.json ./apps/server/ 2>/dev/null || true; \
-      cp /app/package-lock.json ./apps/client/ 2>/dev/null || true; \
-    fi
-
 # Install all dependencies (workspace aware)
-RUN npm install
+RUN bun install --frozen-lockfile
 
 COPY . .
 
 # Build server only
-RUN npm run build:server
+RUN bun run build:server
 
-# Prune dev dependencies from workspaces
-RUN npm prune --omit=dev --workspaces
-
-FROM docker.io/library/node:22 AS runtime
+FROM docker.io/oven/bun:1 AS runtime
 
 WORKDIR /app
 ENV NODE_ENV=production
 
 # Copy only server files needed at runtime
-COPY --from=build /app/package*.json ./
-COPY --from=build /app/apps/server/package*.json ./apps/server/
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/apps/server/node_modules ./apps/server/node_modules
+COPY --from=build /app/package.json /app/bun.lock ./
+COPY --from=build /app/apps/server/package.json ./apps/server/
+COPY --from=build /app/apps/client/package.json ./apps/client/
+RUN bun install --production --frozen-lockfile
 COPY --from=build /app/apps/server/build ./apps/server/build
-
-# Copy startup script
-COPY docker/server/start.sh ./start.sh
-RUN chmod +x ./start.sh
-
-EXPOSE 3000
-
-CMD ["./start.sh"]
 
 # Copy startup script
 COPY docker/server/start.sh ./start.sh
