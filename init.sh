@@ -32,21 +32,27 @@ else
   echo "ℹ️  Using existing .env file."
 fi
 
-# 2. Check for Podman vs Docker
+# 2. Check for Podman vs Docker (prefer Podman)
 if command -v podman &> /dev/null; then
     COMPOSE_CMD="podman"
-    echo "🐳 Using Podman for container orchestration..."
+    echo "🐳 Using Podman Compose (container-only)..."
 elif command -v docker &> /dev/null; then
     COMPOSE_CMD="docker"
-    echo "🐳 Using Docker for container orchestration..."
+    echo "🐳 Podman not found; falling back to Docker Compose (container-only)..."
 else
     echo "❌ Error: Neither 'podman' nor 'docker' was found. Please install one to continue."
     exit 1
 fi
 
+# 2.5 Ensure .env is used by compose for interpolation
+if [ ! -f .env ]; then
+  echo "❌ Error: .env not found in project root."
+  exit 1
+fi
+
 # 3. Build and launch the stack
 echo "🏗️  Building and starting containers... (this may take a few minutes on first run)"
-$COMPOSE_CMD compose up -d --build
+$COMPOSE_CMD compose --env-file .env up -d --build
 
 # 4. Success Output
 PUBLIC_IP=$(curl -s ifconfig.me || echo "Not Available")
@@ -75,8 +81,8 @@ echo "📊 DATABASE ACCESS:"
 echo "  🔗 Local URI: mongodb://admin:password123@$PRIVATE_IP:27017"
 echo ""
 echo "📝 OPERATIONS:"
-echo "  💡 Tip: Use '$COMPOSE_CMD logs -f transparencycheck-server-1' to watch the background sync process."
-echo "  💾 Database Shell: $COMPOSE_CMD exec -it transparencycheck-mongodb-1 mongosh" 
+echo "  💡 Tip: Use '$COMPOSE_CMD compose logs -f server' to watch the server."
+echo "  💾 Database Shell: $COMPOSE_CMD compose exec mongodb mongosh" 
 echo "  🔄 Restart: $COMPOSE_CMD compose down && ./init.sh"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 } | tee instructions.txt
