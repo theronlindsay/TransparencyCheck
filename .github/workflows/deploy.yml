@@ -19,12 +19,8 @@ jobs:
           script: |
             cd ~/TransparencyCheck
             git pull origin master
-            if ! command -v bun >/dev/null 2>&1; then
-              curl -fsSL https://bun.sh/install | bash
-              export PATH="$HOME/.bun/bin:$PATH"
-            fi
-            bun install --frozen-lockfile
-            podman compose down
-            podman compose build --no-cache
-            podman compose up -d
+            # Container-only deploy: build + run via Podman Compose.
+            # Root .env is consumed by compose for interpolation and passed into the server container via env_file.
+            podman compose --env-file .env down
+            podman compose --env-file .env up -d --build
             echo "🚀 Deployment successful! App running at: http://$(curl -s ifconfig.me):8080"
