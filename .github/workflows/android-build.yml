@@ -20,11 +20,10 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: 22
-          cache: 'npm'
+          bun-version: 1.3.11
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -33,22 +32,23 @@ jobs:
           java-version: '21'
 
       - name: Install Dependencies
-        run: npm ci
-        working-directory: apps/client  
+        run: bun install --frozen-lockfile
 
       - name: Generate Android Build Target
-        run: npx cap add android
+        run: bunx cap add android
         working-directory: apps/client
 
       - name: Build Web Assets
-        run: npm run build:client
+        env:
+          VITE_API_BASE_URL: https://transparencycheck.app
+        run: bun run build:client
 
       - name: Sync Capacitor
-        run: npx cap sync android
+        run: bunx cap sync android
         working-directory: apps/client
 
       - name: Create Icons
-        run: npx @capacitor/assets generate
+        run: bunx @capacitor/assets generate
         working-directory: apps/client
 
       - name: Build Android APK (Debug)

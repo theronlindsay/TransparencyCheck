@@ -2,6 +2,6 @@
 
 echo "Starting TransparencyCheck Server..."
 
-echo "Starting Node.js server..."
-exec node -r dotenv/config apps/server/build
+echo "Starting bun server..."
+exec bun apps/server/build
 
