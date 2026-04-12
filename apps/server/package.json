@@ -10,7 +10,9 @@
 		"start": "bun ./build",
 		"prepare": "svelte-kit sync || echo ''",
 		"format": "prettier --write .",
-		"lint": "prettier --check . && eslint ."
+		"lint": "prettier --check . && eslint .",
+		"cron:stocks": "curl -sS \"http://localhost:3000/api/cron/sync-stocks?secret=dev_secret\"",
+		"cron:sync-finance": "curl -sS \"http://localhost:3000/api/cron/sync-finance?secret=dev_secret\""
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-node": "^5.3.3",
@@ -28,6 +30,7 @@
 		"dotenv": "^16.6.1",
 		"mongodb": "^6.21.0",
 		"mongoose": "^8.9.0",
-		"openai": "^6.8.1"
+		"openai": "^6.8.1",
+		"stripe": "^22.0.1"
 	}
 }

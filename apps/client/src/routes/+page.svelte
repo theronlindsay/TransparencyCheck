@@ -237,17 +237,19 @@
 		currentPage = 1;
 
 		try {
-			const params = new URLSearchParams();
+			const q = [];
+			if (appliedSearchQuery) q.push(`search=${encodeURIComponent(appliedSearchQuery)}`);
+			if (appliedStatusFilter !== 'all')
+				q.push(`status=${encodeURIComponent(appliedStatusFilter)}`);
+			if (appliedChamberFilter !== 'all')
+				q.push(`chamber=${encodeURIComponent(appliedChamberFilter)}`);
+			if (appliedSponsorFilter) q.push(`sponsor=${encodeURIComponent(appliedSponsorFilter)}`);
+			if (appliedDateFrom) q.push(`dateFrom=${encodeURIComponent(appliedDateFrom)}`);
+			if (appliedDateTo) q.push(`dateTo=${encodeURIComponent(appliedDateTo)}`);
+			q.push('stream=true');
+			const qs = q.join('&');
 
-			if (appliedSearchQuery) params.append('search', appliedSearchQuery);
-			if (appliedStatusFilter !== 'all') params.append('status', appliedStatusFilter);
-			if (appliedChamberFilter !== 'all') params.append('chamber', appliedChamberFilter);
-			if (appliedSponsorFilter) params.append('sponsor', appliedSponsorFilter);
-			if (appliedDateFrom) params.append('dateFrom', appliedDateFrom);
-			if (appliedDateTo) params.append('dateTo', appliedDateTo);
-			params.append('stream', 'true');
-
-			const response = await fetch(apiUrl(`/api/search-bills?${params.toString()}`));
+			const response = await fetch(apiUrl(`/api/search-bills?${qs}`));
 
 			console.log('Response status:', response.status);
 			console.log('Response headers:', response.headers.get('Content-Type'));
@@ -256,7 +258,8 @@
 				const reader = response.body.getReader();
 				const decoder = new TextDecoder();
 				let buffer = '';
-				const seen = new Set();
+				/** @type {Record<string, true>} */
+				const seen = Object.create(null);
 
 				try {
 					while (true) {
@@ -296,10 +299,10 @@
 									}
 
 									const key = `${(bill.billNumber || '').toLowerCase()}|${bill.congress || ''}`;
-									if (seen.has(key)) {
+									if (seen[key]) {
 										continue;
 									}
-									seen.add(key);
+									seen[key] = true;
 
 									if (payload?.source === 'local') {
 										streamLocalCount += 1;
@@ -522,7 +525,7 @@
 					</div>
 				{:else}
 					<div class="bills-grid">
-						{#each paginatedBills() as bill}
+						{#each paginatedBills() as bill (bill.billNumber + ':' + (bill.congress ?? ''))}
 							<Bill {bill} />
 						{/each}
 					</div>

@@ -30,6 +30,15 @@ export function getAuth() {
 			return betterAuth({
 				database: mongodbAdapter(db),
 				trustedOrigins,
+				user: {
+					additionalFields: {
+						subscriptionTier: {
+							type: "string",
+							required: false,
+							defaultValue: "free"
+						}
+					}
+				},
 				emailAndPassword: {
 					enabled: true
 				},

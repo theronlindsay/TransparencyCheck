@@ -90,7 +90,17 @@ export async function saveTextVersion(billId, version, format, content, isFetche
 const CURRENT_CONGRESS = 119;
 
 export async function getBillById(billId) {
-	return await Bill.findById(billId).lean();
+	if (billId == null || billId === '') return null;
+	const s = String(billId).trim();
+	const candidates = [s, s.toLowerCase(), s.toUpperCase()];
+	const seen = new Set();
+	for (const c of candidates) {
+		if (seen.has(c)) continue;
+		seen.add(c);
+		const doc = await Bill.findById(c).lean();
+		if (doc) return doc;
+	}
+	return null;
 }
 
 export async function getBillTextVersions(billId) {

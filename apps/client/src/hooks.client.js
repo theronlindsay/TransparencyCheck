@@ -8,7 +8,9 @@ export async function init() {
 		capture_exceptions: true,
 		// Keep replay enabled but avoid blocked external recorder script requests.
 		disable_external_dependency_loading: true,
-		disable_session_recording: false
+		disable_session_recording: false,
+		// GDPR Compliance: Wait for active consent
+		opt_out_capturing_by_default: true
 	});
 	console.log('PostHog initialized');
 }

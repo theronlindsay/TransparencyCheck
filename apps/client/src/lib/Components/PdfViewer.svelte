@@ -4,10 +4,7 @@
 
 <div class="pdf-container">
 	{#if url}
-		<iframe
-			src={url}
-			title="PDF Viewer"
-			class="pdf-iframe" ></iframe>
+		<iframe src={url} title="PDF Viewer" class="pdf-iframe"></iframe>
 	{:else}
 		<div class="no-pdf">No PDF URL provided</div>
 	{/if}

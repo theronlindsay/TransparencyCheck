@@ -48,25 +48,24 @@
 		// Apply search filter - searches in title and bill number
 		if (searchQuery.trim()) {
 			const query = searchQuery.toLowerCase();
-			bills = bills.filter(bill => 
-				bill.title?.toLowerCase().includes(query) ||
-				bill.billNumber?.toLowerCase().includes(query) ||
-				bill.id?.toLowerCase().includes(query)
+			bills = bills.filter(
+				(bill) =>
+					bill.title?.toLowerCase().includes(query) ||
+					bill.billNumber?.toLowerCase().includes(query) ||
+					bill.id?.toLowerCase().includes(query)
 			);
 		}
 
 		// Apply chamber filter - filters by origin chamber
 		if (selectedChamber !== 'all') {
-			bills = bills.filter(bill => 
-				bill.originChamber?.toLowerCase() === selectedChamber.toLowerCase()
+			bills = bills.filter(
+				(bill) => bill.originChamber?.toLowerCase() === selectedChamber.toLowerCase()
 			);
 		}
 
 		// Apply party filter - filters by sponsor's party affiliation
 		if (selectedParty !== 'all') {
-			bills = bills.filter(bill => 
-				bill.sponsors?.[0]?.party === selectedParty
-			);
+			bills = bills.filter((bill) => bill.sponsors?.[0]?.party === selectedParty);
 		}
 
 		// Apply sorting based on selected option
@@ -113,7 +112,7 @@
 
 <div class="bills-page">
 	<!-- Page Header -->
-	<div class="page-header">
+	<div class="page-header elevated-surface">
 		<h1>Congressional Bills</h1>
 		<p class="subtitle">Browse and filter all bills in the database</p>
 	</div>
@@ -121,9 +120,9 @@
 	<!-- Filters Panel -->
 	<div class="filters-container">
 		<!-- Toggle Button -->
-		<button 
-			class="toggle-filters-btn" 
-			onclick={() => showFilters = !showFilters}
+		<button
+			class="toggle-filters-btn"
+			onclick={() => (showFilters = !showFilters)}
 			aria-label="Toggle filters"
 		>
 			<span class="icon">{showFilters ? '▼' : '▶'}</span>
@@ -182,22 +181,24 @@
 
 				<!-- Reset Button -->
 				<div class="filter-group">
-					<button class="reset-btn" onclick={resetFilters}>
-						Reset Filters
-					</button>
+					<button class="reset-btn" onclick={resetFilters}> Reset Filters </button>
 				</div>
 			</div>
 		{/if}
 	</div>
 
 	<!-- Results Count -->
-	{#await data.bills}
-		<div class="loading-message">
+	{#if isLoading}
+		<div class="loading-message elevated-surface">
 			<div class="spinner"></div>
 			<p>Loading bills...</p>
 		</div>
-	{:then}
-		<div class="results-info">
+	{:else if error}
+		<div class="error-message elevated-surface">
+			<p>Error loading bills: {error}</p>
+		</div>
+	{:else}
+		<div class="results-info elevated-surface">
 			<p>
 				Showing <strong>{filteredBills.length}</strong> of <strong>{billsData?.length || 0}</strong> bills
 			</p>
@@ -205,7 +206,7 @@
 
 		<!-- Bills Grid -->
 		{#if filteredBills.length === 0}
-			<div class="empty-state">
+			<div class="empty-state elevated-surface">
 				<p>No bills match your filters.</p>
 				<button class="reset-btn" onclick={resetFilters}>Clear Filters</button>
 			</div>
@@ -216,11 +217,7 @@
 				{/each}
 			</div>
 		{/if}
-	{:catch error}
-		<div class="error-message">
-			<p>Error loading bills: {error.message}</p>
-		</div>
-	{/await}
+	{/if}
 </div>
 
 <style>
@@ -234,6 +231,8 @@
 	.page-header {
 		text-align: center;
 		margin-bottom: 2rem;
+		padding: 1.5rem 1.25rem;
+		border-radius: var(--radius-lg);
 	}
 
 	.page-header h1 {
@@ -249,11 +248,13 @@
 
 	/* Filters Container */
 	.filters-container {
-		background: var(--bg-secondary);
-		border: 1px solid var(--border-color);
+		background: var(--surface-3d-gradient);
+		border: 1px solid rgba(255, 255, 255, 0.09);
 		border-radius: var(--radius-lg);
 		padding: 1.5rem;
 		margin-bottom: 2rem;
+		backdrop-filter: var(--blur);
+		box-shadow: var(--shadow-3d-stack);
 	}
 
 	/* Toggle Filters Button */
@@ -360,8 +361,10 @@
 	/* Results Info */
 	.results-info {
 		margin-bottom: 1.5rem;
+		padding: 1rem 1.25rem;
 		text-align: center;
 		color: var(--text-secondary);
+		border-radius: var(--radius-lg);
 	}
 
 	.results-info strong {
@@ -379,8 +382,9 @@
 	/* Empty State */
 	.empty-state {
 		text-align: center;
-		padding: 4rem 2rem;
+		padding: 3rem 2rem;
 		color: var(--text-secondary);
+		border-radius: var(--radius-lg);
 	}
 
 	.empty-state p {
@@ -394,8 +398,9 @@
 		flex-direction: column;
 		align-items: center;
 		gap: 1rem;
-		padding: 4rem 2rem;
+		padding: 3rem 2rem;
 		color: var(--text-secondary);
+		border-radius: var(--radius-lg);
 	}
 
 	.spinner {
@@ -415,11 +420,9 @@
 
 	.error-message {
 		text-align: center;
-		padding: 4rem 2rem;
+		padding: 3rem 2rem;
 		color: #f87171;
-		background: rgba(248, 113, 113, 0.1);
 		border-radius: var(--radius-lg);
-		border: 1px solid rgba(248, 113, 113, 0.3);
 	}
 
 	/* Responsive Design */

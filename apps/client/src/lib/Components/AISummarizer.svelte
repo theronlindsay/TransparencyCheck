@@ -24,12 +24,6 @@
 	// Validation errors from server
 	let serverErrors = $state([]);
 
-	// Chat state
-	let conversationId = $state(null);
-	let chatMessages = $state([]);
-	let followUpQuestion = $state('');
-	let isSendingFollowUp = $state(false);
-
 	async function generatePrompt() {
 		if (!browser) return; // Only run on client
 
@@ -128,6 +122,7 @@
 
 			const response = await fetch(apiUrl('/api/openAI'), {
 				method: 'POST',
+				credentials: 'include',
 				headers: {
 					'Content-Type': 'application/json'
 				},
@@ -152,19 +147,6 @@
 			if (data.success && data.response) {
 				// API call succeeded, show the response
 				aiResponse = data.response;
-				conversationId = data.conversationId; // Save for follow-up questions
-
-				// Add initial exchange to chat history
-				chatMessages = [
-					{
-						role: 'user',
-						content: 'Summarize this bill with the selected options'
-					},
-					{
-						role: 'assistant',
-						content: data.response
-					}
-				];
 
 				serverErrors = []; // Clear any errors
 				posthog.capture('ai_summary_generated', {
@@ -226,80 +208,12 @@
 		generatedPrompt = '';
 		aiResponse = '';
 		showPrompt = false;
-		conversationId = null;
-		chatMessages = [];
 		outputLength = 100;
 
 		// Remove visible class from prompt display
 		const promptDisplay = document.querySelector('.prompt-display');
 		if (promptDisplay) {
 			promptDisplay.classList.remove('visible');
-		}
-	}
-
-	// Send follow-up question in chat
-	async function sendFollowUp() {
-		if (!followUpQuestion.trim() || !conversationId || isSendingFollowUp) return;
-
-		const question = followUpQuestion.trim();
-		followUpQuestion = '';
-		isSendingFollowUp = true;
-		posthog.capture('ai_followup_sent', { bill_number: billNumber });
-
-		// Add user message to chat
-		chatMessages = [...chatMessages, { role: 'user', content: question }];
-
-		try {
-			const requestBody = {
-				prompt: question,
-				conversationId: conversationId
-			};
-
-			// Add tools if web search was enabled
-			if (enableWebSearch) {
-				requestBody.tools = [{ type: 'web_search_preview' }];
-			}
-
-			const response = await fetch(apiUrl('/api/openAI'), {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(requestBody)
-			});
-
-			const data = await response.json();
-
-			if (data.success && data.response) {
-				// Update conversation ID and add response to chat
-				conversationId = data.conversationId;
-				chatMessages = [...chatMessages, { role: 'assistant', content: data.response }];
-				aiResponse = data.response; // Update main response too
-			} else {
-				chatMessages = [
-					...chatMessages,
-					{
-						role: 'error',
-						content: data.error || 'Failed to get response'
-					}
-				];
-			}
-		} catch (error) {
-			chatMessages = [
-				...chatMessages,
-				{
-					role: 'error',
-					content: 'Network error: ' + error.message
-				}
-			];
-		} finally {
-			isSendingFollowUp = false;
-
-			// Scroll chat to bottom
-			setTimeout(() => {
-				const chatContainer = document.querySelector('.chat-messages');
-				if (chatContainer) {
-					chatContainer.scrollTop = chatContainer.scrollHeight;
-				}
-			}, 50);
 		}
 	}
 
@@ -424,7 +338,7 @@
 				<div class="error-banner">
 					<span class="error-icon">⚠️</span>
 					<div class="error-list">
-							{#each serverErrors as error, idx (idx)}
+						{#each serverErrors as error, idx (idx)}
 							<div>{error}</div>
 						{/each}
 					</div>
@@ -693,26 +607,37 @@
 	}
 
 	.btn-primary {
-		background: var(--accent);
+		background: var(--depth-primary-face);
 		color: white;
+		box-shadow: var(--depth-primary-rest);
 	}
 
-	.btn-primary:hover {
-		background: #ff5b58;
+	.btn-primary:hover:not(:disabled) {
 		transform: translateY(-2px);
-		box-shadow: 0 6px 20px rgba(241, 58, 55, 0.4);
+		box-shadow: var(--depth-primary-hover);
+	}
+
+	.btn-primary:active:not(:disabled) {
+		transform: translateY(2px);
+		box-shadow: var(--depth-primary-active);
 	}
 
 	.btn-secondary {
-		background: rgba(241, 58, 55, 0.1);
+		background: rgba(255, 255, 255, 0.04);
 		color: var(--text-primary);
-		border: 1px solid rgba(241, 58, 55, 0.3);
+		border: 1px solid rgba(255, 255, 255, 0.12);
+		box-shadow:
+			inset 0 1px 0 rgba(255, 255, 255, 0.08),
+			0 4px 14px rgba(0, 0, 0, 0.22);
 	}
 
 	.btn-secondary:hover {
-		background: rgba(241, 58, 55, 0.2);
-		border-color: rgba(241, 58, 55, 0.5);
+		background: rgba(255, 255, 255, 0.07);
+		border-color: rgba(241, 58, 55, 0.35);
 		transform: translateY(-2px);
+		box-shadow:
+			inset 0 1px 0 rgba(255, 255, 255, 0.1),
+			0 6px 18px rgba(0, 0, 0, 0.28);
 	}
 
 	.btn-copy {

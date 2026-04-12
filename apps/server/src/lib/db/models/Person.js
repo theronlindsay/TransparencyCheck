@@ -10,7 +10,14 @@ const personSchema = new mongoose.Schema(
 		party: String,
 		state: String,
 		district: String,
-		donors: mongoose.Schema.Types.Mixed,
+		imageUrl: String,
+		sponsoredBills: [{
+			number: String,
+			displayTitle: String,
+			introducedDate: String,
+			congress: Number
+		}],
+		fec_candidate_id: String,
 		url: String
 	},
 	{ _id: false }

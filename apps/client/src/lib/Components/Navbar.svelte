@@ -2,26 +2,29 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 
 	// Props for customization
-	let { items = [
-		{ id: 'home', label: 'Home', active: true, href: '/' },
-		{ id: 'bills', label: 'Bills', active: false, href: '/bill' },
-		{ id: 'heirarchy', label: 'Heirarchy', active: false, href: '/heirarchy' },
-		{ id: 'chat', label: 'Chat', active: false, href: '/chat' }
-	] } = $props();
+	let {
+		items = [
+			{ id: 'home', label: 'Home', active: true, href: '/' },
+			{ id: 'bills', label: 'Bills', active: false, href: '/bill' },
+			{ id: 'heirarchy', label: 'Heirarchy', active: false, href: '/heirarchy' },
+			{ id: 'chat', label: 'Chat', active: false, href: '/chat' }
+		]
+	} = $props();
 
 	let activeItem = $derived.by(() => {
 		const currentPath = $page.url.pathname;
 		// Try exact match first
-		let matchedItem = items.find(item => item.href === currentPath);
+		let matchedItem = items.find((item) => item.href === currentPath);
 		// If no exact match, try partial match (e.g., /bill/HR1 matches /bill)
 		if (!matchedItem) {
-			matchedItem = items.find(item => item.href !== '/' && currentPath.startsWith(item.href));
+			matchedItem = items.find((item) => item.href !== '/' && currentPath.startsWith(item.href));
 		}
 		return matchedItem?.id || items[0]?.id;
 	});
-	
+
 	let visuallyActiveItem = $state('');
 	let selectorElement;
 	let navElement;
@@ -41,7 +44,7 @@
 		const targetElement = itemElements[targetId];
 		const containerRect = navElement.querySelector('.navbar-container').getBoundingClientRect();
 		const targetRect = targetElement.getBoundingClientRect();
-		
+
 		// Calculate position relative to the navbar container, accounting for container padding
 		const offsetX = targetRect.left - containerRect.left - 6; // Subtract container padding
 		const width = targetRect.width;
@@ -55,9 +58,9 @@
 	function handleItemClick(itemId, href) {
 		// Don't navigate if already on this page
 		if (activeItem === itemId) return;
-		
+
 		moveSelector(itemId);
-		
+
 		// Delay the visual boldness change until near the end of animation (300ms out of 400ms)
 		setTimeout(() => {
 			visuallyActiveItem = itemId;
@@ -65,7 +68,7 @@
 
 		// Use SvelteKit's client-side navigation (no page reload!)
 		if (href) {
-			goto(href);
+			goto(resolve(href));
 		}
 	}
 
@@ -76,12 +79,12 @@
 			// Set initial visual state without delay
 			visuallyActiveItem = activeItem;
 		}, 50);
-		
+
 		// Handle window resize
 		const handleResize = () => {
 			moveSelector(activeItem);
 		};
-		
+
 		window.addEventListener('resize', handleResize);
 		return () => window.removeEventListener('resize', handleResize);
 	});
@@ -90,13 +93,10 @@
 <nav class="navbar" bind:this={navElement}>
 	<div class="navbar-container">
 		<!-- Background selector -->
-		<div 
-			class="selector" 
-			bind:this={selectorElement}
-		></div>
-		
+		<div class="selector" bind:this={selectorElement}></div>
+
 		<!-- Navigation items -->
-		{#each items as item}
+		{#each items as item (item.id)}
 			<button
 				bind:this={itemElements[item.id]}
 				class="nav-item {visuallyActiveItem === item.id ? 'active' : ''}"
@@ -200,12 +200,12 @@
 			gap: 2px;
 			padding: 4px;
 		}
-		
+
 		.nav-item {
 			padding: 10px 16px;
 			font-size: 13px;
 		}
-		
+
 		.selector {
 			top: 4px;
 			left: 4px;

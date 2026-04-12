@@ -21,10 +21,9 @@ export default defineConfig({
 							plugins: [
 								{
 									handlerDidError: async () => {
-										return new Response(
-											JSON.stringify({ type: 'data', nodes: [null, null] }),
-											{ headers: { 'Content-Type': 'application/json' } }
-										);
+										return new Response(JSON.stringify({ type: 'data', nodes: [null, null] }), {
+											headers: { 'Content-Type': 'application/json' }
+										});
 									}
 								}
 							]

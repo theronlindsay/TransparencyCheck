@@ -77,9 +77,7 @@
 				? `Bill: ${context.data?.billNumber || 'Unknown'}\nTitle: ${context.data?.billTitle || 'Unknown'}`
 				: '';
 		const billText = context.pageType === 'bill' ? (context.data?.billText || '').trim() : '';
-		const billTextForContext = billText
-			? billText.slice(0, MAX_BILL_TEXT_CONTEXT_CHARS)
-			: '';
+		const billTextForContext = billText ? billText.slice(0, MAX_BILL_TEXT_CONTEXT_CHARS) : '';
 		const billTextContext = billTextForContext
 			? `Bill text context${billText.length > MAX_BILL_TEXT_CONTEXT_CHARS ? ' (truncated)' : ''}:\n${billTextForContext}`
 			: 'Bill text context not available.';
@@ -100,10 +98,7 @@
 	async function submitQuestion(question, options = {}) {
 		if (!question?.trim() || isSending) return;
 
-		const {
-			displayQuestion = question,
-			tools = DEFAULT_TOOLS
-		} = options;
+		const { displayQuestion = question, tools = DEFAULT_TOOLS } = options;
 
 		isSending = true;
 
@@ -122,6 +117,7 @@
 
 			const response = await fetch(apiUrl('/api/openAI'), {
 				method: 'POST',
+				credentials: 'include',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(requestBody)
 			});
