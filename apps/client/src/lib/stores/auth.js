@@ -49,7 +49,16 @@ export async function signInEmail(email, password) {
 			email,
 			password
 		});
-		sessionStore.set(mapSessionPayload(result));
+
+		const mappedSession = mapSessionPayload(result);
+		if (!mappedSession?.user) {
+			const errorMessage = result?.error?.message || 'Sign in failed.';
+			authErrorStore.set(errorMessage);
+			sessionStore.set(null);
+			return { ok: false, message: errorMessage };
+		}
+
+		sessionStore.set(mappedSession);
 		return { ok: true };
 	} catch (error) {
 		authErrorStore.set(error?.message || 'Sign in failed.');

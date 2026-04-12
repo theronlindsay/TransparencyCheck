@@ -1,15 +1,22 @@
 /**
  * API Configuration
- * 
+ *
  * When running in Static Client (Capacitor), API calls go to the VPS server.
  * When running in browser on the VPS, API calls use relative paths.
  */
 
 const envBase = import.meta.env.VITE_API_BASE_URL;
-const API_BASE_URL = typeof envBase !== 'undefined' ? envBase : 'https://transparencycheck.app';
+const isDev = import.meta.env.DEV;
+// Force relative paths during local development so Better Auth doesn't hit CORS errors when talking to production
+const API_BASE_URL = isDev
+	? ''
+	: typeof envBase !== 'undefined'
+		? envBase
+		: 'https://transparencycheck.app';
 
 // Log API configuration on startup for debugging (visible in browser console and Android Logcat)
 console.log('🌐 API Configuration Loaded');
+console.log('   Mode:', isDev ? 'Development' : 'Production');
 console.log('   VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL);
 console.log('   API_BASE_URL:', API_BASE_URL);
 console.log('   Empty base URL means relative paths (same origin)');

@@ -5,39 +5,48 @@ import {
 	getBillActions,
 	fetchAndStoreTextVersions
 } from '$lib/db/bills.js';
+import { importBillBySlugIfMissing } from '$lib/bill-fetcher.js';
 
 const CONGRESS_API_KEY = process.env.CONGRESS_API_KEY;
 
 export async function GET({ params }) {
 	try {
+		const rawId = params.id?.trim();
+		if (!rawId) {
+			return json({ error: 'Missing bill id' }, { status: 400 });
+		}
 
-		const billData = await getBillById(params.id);
+		let billData = await getBillById(rawId);
+		if (!billData) {
+			const canonicalId = await importBillBySlugIfMissing(rawId);
+			if (canonicalId) {
+				billData = await getBillById(canonicalId);
+			}
+		}
 
 		if (!billData) {
 			return json({ error: 'Bill not found' }, { status: 404 });
 		}
 
-		// Get text versions and actions
-		let textVersions = await getBillTextVersions(params.id);
+		const billKey = billData._id;
 
-		// If no text versions in database and we have a textVersionsUrl, fetch them
-		// now (blocking) so they are included in this response instead of requiring
-		// a second page load.
+		let textVersions = await getBillTextVersions(billKey);
+
 		if (textVersions.length === 0 && billData.textVersionsUrl && CONGRESS_API_KEY) {
-			console.log(`📥 Fetching text versions for ${params.id}…`);
+			console.log(`📥 Fetching text versions for ${billKey}…`);
 			try {
 				textVersions = await fetchAndStoreTextVersions(
-					params.id,
+					billKey,
 					billData.textVersionsUrl,
 					CONGRESS_API_KEY
 				);
-				console.log(`✅ Fetched and stored ${textVersions.length} text versions for ${params.id}`);
+				console.log(`✅ Fetched and stored ${textVersions.length} text versions for ${billKey}`);
 			} catch (err) {
-				console.error(`Failed to fetch text versions for ${params.id}:`, err);
+				console.error(`Failed to fetch text versions for ${billKey}:`, err);
 			}
 		}
 
-		const actions = await getBillActions(params.id);
+		const actions = await getBillActions(billKey);
 
 		// Format the bill data
 		const bill = {
@@ -83,14 +92,14 @@ function formatBillNumber(billNumber, billType) {
 	if (!billNumber) return '';
 
 	const typeMap = {
-		HR: 'H.R.',
-		S: 'S.',
-		HRES: 'H.RES.',
-		SRES: 'S.RES.',
-		HJRES: 'H.J.RES.',
-		SJRES: 'S.J.RES.',
-		HCONRES: 'H.CON.RES.',
-		SCONRES: 'S.CON.RES.'
+		HR: 'HR',
+		S: 'S',
+		HRES: 'HRES',
+		SRES: 'SRES',
+		HJRES: 'HJRES',
+		SJRES: 'SJRES',
+		HCONRES: 'HCONRES',
+		SCONRES: 'SCONRES'
 	};
 
 	const prefix = typeMap[billType?.toUpperCase()] || billType || '';

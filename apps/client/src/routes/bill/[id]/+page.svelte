@@ -2,9 +2,11 @@
 	import { onMount } from 'svelte';
 	import { onDestroy } from 'svelte';
 	import PdfViewer from '$lib/Components/PdfViewer.svelte';
+	import AuthModal from '$lib/Components/AuthModal.svelte';
 	import { apiUrl } from '$lib/config.js';
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
+	import { resolve } from '$app/paths';
 	import { fly } from 'svelte/transition';
 	import {
 		registerAssistantSource,
@@ -19,6 +21,11 @@
 	let actions = $state([]);
 	let isLoading = $state(true);
 	let loadError = $state(null);
+	let isSaved = $state(false);
+	let isSaving = $state(false);
+
+	let showAuthModal = $state(false);
+	let authModalFeature = $state('');
 
 	// Mobile PDF Viewer Logic
 	let showMobilePdf = $state(false);
@@ -69,24 +76,85 @@
 		}
 	});
 
-	// Fetch bill data client-side
+	let billFetchGeneration = 0;
+
+	// Fetch bill data client-side (uncached bills may take longer; spinner until this completes)
 	async function fetchBillFromAPI(billId) {
+		const gen = ++billFetchGeneration;
 		isLoading = true;
 		loadError = null;
+		bill = null;
+		textVersions = [];
+		actions = [];
+		isSaved = false;
 		try {
-			const response = await fetch(apiUrl(`/api/bills/${billId}`));
+			const response = await fetch(apiUrl(`/api/bills/${encodeURIComponent(billId)}`));
+			if (gen !== billFetchGeneration) return;
 			if (!response.ok) {
-				throw new Error(`Failed to fetch bill: ${response.status}`);
+				const errText = await response.text();
+				let detail = String(response.status);
+				try {
+					const errJson = JSON.parse(errText);
+					if (errJson?.error) detail = errJson.error;
+				} catch {
+					if (errText?.trim()) detail = errText.trim().slice(0, 160);
+				}
+				throw new Error(
+					response.status === 404
+						? `Bill not found (${billId}). It may not exist in Congress.gov for recent sessions, or the server could not load it.`
+						: `Could not load bill (${detail})`
+				);
 			}
 			const result = await response.json();
+			if (gen !== billFetchGeneration) return;
 			bill = result.bill;
 			textVersions = result.textVersions || [];
 			actions = result.actions || [];
+
+			const saveBillKey = result.bill?.number ?? result.bill?.id ?? billId;
+			const saveRes = await fetch(
+				apiUrl(`/api/bills/save?billId=${encodeURIComponent(saveBillKey)}`)
+			);
+			if (gen !== billFetchGeneration) return;
+			if (saveRes.ok) {
+				const saveData = await saveRes.json();
+				isSaved = saveData.isSaved;
+			}
 		} catch (err) {
+			if (gen !== billFetchGeneration) return;
 			console.error('Error fetching bill:', err);
-			loadError = err.message;
+			loadError = err.message ?? 'Failed to load bill';
 		} finally {
-			isLoading = false;
+			if (gen === billFetchGeneration) {
+				isLoading = false;
+			}
+		}
+	}
+
+	async function toggleSaveBill() {
+		if (isSaving || !bill) return;
+		isSaving = true;
+
+		try {
+			const action = isSaved ? 'unsave' : 'save';
+			const res = await fetch(apiUrl('/api/bills/save'), {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ billId: bill.number, title: bill.title, action })
+			});
+			if (res.ok) {
+				const data = await res.json();
+				isSaved = data.isSaved;
+				posthog.capture(`bill_${action}`, { bill_id: bill.number });
+			} else if (res.status === 401) {
+				// Require login if unauthorized
+				authModalFeature = 'save bills to your account';
+				showAuthModal = true;
+			}
+		} catch (err) {
+			console.error('Error toggling save status:', err);
+		} finally {
+			isSaving = false;
 		}
 	}
 
@@ -387,17 +455,20 @@
 </script>
 
 {#if isLoading}
-	<div class="loading-container">
-		<div class="loading-spinner"></div>
-		<p>Loading bill details...</p>
+	<div class="page-container bill-loading-screen" role="status" aria-live="polite" aria-busy="true">
+		<div class="bill-loading-inner elevated-surface">
+			<div class="spinner" aria-hidden="true"></div>
+			<p class="bill-loading-title">Loading bill…</p>
+			<p class="bill-loading-id">{$page.params.id}</p>
+		</div>
 	</div>
 {:else if loadError}
-	<div class="error-container">
+	<div class="error-container elevated-surface">
 		<p class="error-message">{loadError}</p>
 		<button onclick={handleRetry}>Retry</button>
 	</div>
 {:else if !bill}
-	<div class="error-container">
+	<div class="error-container elevated-surface">
 		<p class="error-message">Bill not found</p>
 	</div>
 {:else}
@@ -405,7 +476,7 @@
 		<!-- Main Content -->
 		<div class="main-content">
 			<div class="bill-detail-page">
-				<div class="bill-header">
+				<div class="bill-header elevated-surface">
 					<div class="header-top">
 						<span class="bill-number">{bill.number}</span>
 					</div>
@@ -418,7 +489,15 @@
 						</div>
 						<div class="meta-item">
 							<span class="meta-label">Sponsor</span>
-							<span class="meta-value">{formatSponsor(bill.sponsors)}</span>
+							<span class="meta-value">
+								{#if bill.sponsors && bill.sponsors[0] && bill.sponsors[0].bioguideId}
+									<a href={resolve(`/member/${bill.sponsors[0].bioguideId}`)} class="sponsor-link">
+										{formatSponsor(bill.sponsors)}
+									</a>
+								{:else}
+									{formatSponsor(bill.sponsors)}
+								{/if}
+							</span>
 						</div>
 						<div class="meta-item">
 							<span class="meta-label">Committee</span>
@@ -432,6 +511,39 @@
 
 					<!-- Action Buttons -->
 					<div class="action-buttons">
+						<button
+							type="button"
+							class="button {isSaved ? 'secondary' : 'primary'}"
+							disabled={isSaving}
+							onclick={toggleSaveBill}
+							style="margin-right: 0.5rem;"
+						>
+							{#if isSaved}
+								<svg
+									width="16"
+									height="16"
+									viewBox="0 0 24 24"
+									fill="currentColor"
+									xmlns="http://www.w3.org/2000/svg"
+								>
+									<path d="M17 3H7c-1.1 0-1.99.9-1.99 2L5 21l7-3 7 3V5c0-1.1-.9-2-2-2z" />
+								</svg>
+								Saved
+							{:else}
+								<svg
+									width="16"
+									height="16"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									xmlns="http://www.w3.org/2000/svg"
+								>
+									<path d="M17 3H7c-1.1 0-1.99.9-1.99 2L5 21l7-3 7 3V5c0-1.1-.9-2-2-2z" />
+								</svg>
+								Save Bill
+							{/if}
+						</button>
 						<button
 							type="button"
 							class="button primary"
@@ -459,14 +571,14 @@
 				</div>
 
 				{#if bill.latestAction}
-					<section class="section latest-action">
+					<section class="section latest-action elevated-surface bill-section-panel">
 						<h2>Latest Action</h2>
 						<p class="action-text">{bill.latestAction}</p>
 					</section>
 				{/if}
 
 				{#if actions && actions.length > 0}
-					<section class="section">
+					<section class="section elevated-surface bill-section-panel">
 						<h2>Legislative Actions</h2>
 						<p class="section-description">Complete timeline of all actions taken on this bill</p>
 						<div class="timeline">
@@ -486,21 +598,21 @@
 				{/if}
 
 				{#if bill.summary}
-					<section class="section">
+					<section class="section elevated-surface bill-section-panel">
 						<h2>Summary</h2>
 						<p class="summary-text">{bill.summary}</p>
 					</section>
 				{/if}
 
 				{#if bill.summaryLong && bill.summaryLong !== bill.summary}
-					<section class="section">
+					<section class="section elevated-surface bill-section-panel">
 						<h2>Detailed Summary</h2>
 						<p class="summary-text">{bill.summaryLong}</p>
 					</section>
 				{/if}
 
 				{#if bill.votes && bill.votes.length > 0}
-					<section class="section">
+					<section class="section elevated-surface bill-section-panel">
 						<h2>Votes</h2>
 						<div class="votes-grid">
 							{#each bill.votes as vote, voteIndex (`${vote.date || ''}-${vote.result || vote.title || voteIndex}`)}
@@ -528,7 +640,7 @@
 				{/if}
 
 				{#if bill.schedule && bill.schedule.length > 0}
-					<section class="section">
+					<section class="section elevated-surface bill-section-panel">
 						<h2>Schedule</h2>
 						<div class="timeline">
 							{#each bill.schedule as item, scheduleIndex (`${item.date || ''}-${item.description || item.text || scheduleIndex}`)}
@@ -544,7 +656,7 @@
 				{/if}
 
 				{#if bill.news && bill.news.length > 0}
-					<section class="section">
+					<section class="section elevated-surface bill-section-panel">
 						<h2>Related News</h2>
 						<div class="news-grid">
 							{#each bill.news as article, articleIndex (`${article.url || ''}-${article.title || articleIndex}`)}
@@ -575,7 +687,7 @@
 
 				<!-- Bill Text Versions Section -->
 				{#if textVersions && textVersions.length > 0}
-					<section class="section text-versions">
+					<section class="section text-versions elevated-surface bill-section-panel">
 						<h2>Bill Text Versions</h2>
 						<p class="section-description">View different versions of this bill text</p>
 
@@ -741,7 +853,7 @@
 						{/if}
 					</section>
 				{:else}
-					<section class="section text-versions-unavailable">
+					<section class="section text-versions-unavailable elevated-surface bill-section-panel">
 						<h2>Bill Text</h2>
 						<p class="unavailable-message">
 							Text versions are being loaded or not yet available for this bill.
@@ -797,8 +909,67 @@
 	{/if}
 {/if}
 
+<AuthModal bind:show={showAuthModal} feature={authModalFeature} />
+
 <style>
-	.loading-container,
+	.sponsor-link {
+		color: var(--blue-accent);
+		text-decoration: none;
+		font-weight: 500;
+	}
+	.sponsor-link:hover {
+		text-decoration: underline;
+		color: var(--accent);
+	}
+
+	.bill-loading-screen {
+		min-height: 55vh;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 2rem 1rem;
+	}
+
+	.bill-loading-inner {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 1rem;
+		text-align: center;
+		padding: 2rem 2.5rem;
+		border-radius: var(--radius-lg);
+	}
+
+	.bill-loading-screen .spinner {
+		width: 44px;
+		height: 44px;
+		border: 3px solid rgba(255, 255, 255, 0.1);
+		border-radius: 50%;
+		border-top-color: var(--accent);
+		animation: bill-spin 0.9s ease-in-out infinite;
+	}
+
+	@keyframes bill-spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	.bill-loading-title {
+		margin: 0;
+		font-size: 1.15rem;
+		font-weight: 600;
+		color: var(--text-primary);
+	}
+
+	.bill-loading-id {
+		margin: 0;
+		font-size: 0.95rem;
+		font-family: ui-monospace, monospace;
+		color: var(--text-secondary);
+		text-transform: uppercase;
+	}
+
 	.error-container {
 		display: flex;
 		flex-direction: column;
@@ -806,22 +977,11 @@
 		justify-content: center;
 		min-height: 50vh;
 		gap: 1rem;
+		padding: 2rem 1.5rem;
+		max-width: 28rem;
+		margin: 2rem auto;
 		color: var(--text-secondary);
-	}
-
-	.loading-spinner {
-		width: 40px;
-		height: 40px;
-		border: 3px solid var(--border-color);
-		border-top-color: var(--accent);
-		border-radius: 50%;
-		animation: spin 1s linear infinite;
-	}
-
-	@keyframes spin {
-		to {
-			transform: rotate(360deg);
-		}
+		border-radius: var(--radius-lg);
 	}
 
 	.error-message {
@@ -878,6 +1038,8 @@
 
 	.bill-header {
 		margin-bottom: 3rem;
+		padding: 1.75rem 1.5rem;
+		border-radius: var(--radius-lg);
 	}
 
 	.header-top {
@@ -926,9 +1088,11 @@
 		gap: 1.5rem;
 		margin-bottom: 2rem;
 		padding: 1.5rem;
-		background: var(--bg-secondary);
-		border-radius: var(--radius-lg);
-		border: 1px solid var(--border-color);
+		border-radius: var(--radius-md);
+		background: var(--surface-3d-gradient);
+		border: 1px solid rgba(255, 255, 255, 0.09);
+		box-shadow: var(--shadow-3d-stack);
+		transform: translateZ(0);
 	}
 
 	.meta-item {
@@ -1002,11 +1166,12 @@
 		border-bottom: 2px solid var(--border-color);
 	}
 
-	.latest-action {
-		padding: 2rem;
-		background: var(--bg-secondary);
+	.bill-section-panel {
+		padding: 1.5rem 1.35rem;
 		border-radius: var(--radius-lg);
-		border: 1px solid var(--border-color);
+	}
+
+	.latest-action {
 		border-left: 4px solid var(--accent);
 	}
 
@@ -1039,9 +1204,11 @@
 
 	.card {
 		padding: 1.5rem;
-		background: var(--bg-secondary);
+		background: var(--surface-3d-gradient);
 		border-radius: var(--radius-lg);
-		border: 1px solid var(--border-color);
+		border: 1px solid rgba(255, 255, 255, 0.09);
+		box-shadow: var(--shadow-3d-stack);
+		transform: translateZ(0);
 	}
 
 	.card h3 {
@@ -1159,13 +1326,6 @@
 	}
 
 	/* Text Versions Styles */
-	.text-versions {
-		padding: 2rem;
-		background: var(--bg-secondary);
-		border-radius: var(--radius-lg);
-		border: 1px solid var(--border-color);
-	}
-
 	.text-versions h2 {
 		margin: 0 0 0.5rem 0;
 	}
@@ -1447,10 +1607,6 @@
 	}
 
 	.text-versions-unavailable {
-		padding: 2rem;
-		background: var(--bg-secondary);
-		border-radius: var(--radius-lg);
-		border: 1px solid var(--border-color);
 		text-align: center;
 	}
 

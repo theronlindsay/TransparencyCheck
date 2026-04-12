@@ -48,7 +48,10 @@ function determineBillStatus(bill) {
 
 async function getBillDetails(billUrl) {
 	if (!CONGRESS_API_KEY) throw new Error('CONGRESS_API_KEY is not defined');
-	const url = `${billUrl}?format=json&api_key=${CONGRESS_API_KEY}`;
+	const urlObj = new URL(billUrl);
+	urlObj.searchParams.set('format', 'json');
+	urlObj.searchParams.set('api_key', CONGRESS_API_KEY);
+	const url = urlObj.toString();
 	console.log(`  🔍 Fetching bill details: ${url}`);
 	const response = await fetch(url);
 	if (!response.ok) {
@@ -82,7 +85,11 @@ async function saveBillToDatabase(bill) {
 	const committeesUrl = detailedBill.committees?.url || detailedBill.committeesUrl;
 	if (committeesUrl && CONGRESS_API_KEY) {
 		try {
-			const commUrl = `${committeesUrl}&api_key=${CONGRESS_API_KEY}`;
+			const cUrlObj = new URL(committeesUrl);
+			cUrlObj.searchParams.set('format', 'json');
+			cUrlObj.searchParams.set('api_key', CONGRESS_API_KEY);
+			const commUrl = cUrlObj.toString();
+			
 			const commRes = await fetch(commUrl);
 			if (commRes.ok) {
 				const commData = await commRes.json();
@@ -101,6 +108,40 @@ async function saveBillToDatabase(bill) {
 	await saveBill(billId, billStatus, detailedBill);
 
 	return detailedBill;
+}
+
+/** Try recent Congresses when a user opens a bill we have not synced yet. */
+const IMPORT_BILL_CONGRESSES = [119, 118, 117, 116];
+
+/**
+ * Fetch a single bill from Congress.gov v3 and persist it (same pipeline as bulk sync).
+ * @param {string} rawSlug e.g. "HR123", "hr123", "s456"
+ * @returns {Promise<string|null>} canonical Mongo _id (e.g. "HR123") or null
+ */
+export async function importBillBySlugIfMissing(rawSlug) {
+	if (!CONGRESS_API_KEY) return null;
+	const slug = String(rawSlug).trim();
+	const m = slug.match(/^([A-Za-z]+)(\d+)$/);
+	if (!m) return null;
+	const billTypePath = m[1].toLowerCase();
+	const billNumber = m[2];
+
+	for (const congress of IMPORT_BILL_CONGRESSES) {
+		const url = `https://api.congress.gov/v3/bill/${congress}/${billTypePath}/${billNumber}?format=json&api_key=${CONGRESS_API_KEY}`;
+		const res = await fetch(url);
+		if (!res.ok) continue;
+		const data = await res.json();
+		const b = data.bill;
+		if (!b) continue;
+		try {
+			await saveBillToDatabase(b);
+			return `${b.type}${b.number}`;
+		} catch (err) {
+			console.error(`[importBillBySlug] save failed for ${slug}:`, err.message);
+			return null;
+		}
+	}
+	return null;
 }
 
 export async function fetchAndStoreBills({ searchQuery, congress, dateFrom, dateTo, limit = 40 } = {}) {

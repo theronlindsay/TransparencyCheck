@@ -7,6 +7,7 @@
 	let mode = $state('login');
 	let isSubmitting = $state(false);
 	let notice = $state('');
+	let showInvalidCredentials = $state(false);
 
 	let loginEmail = $state('');
 	let loginPassword = $state('');
@@ -39,6 +40,7 @@
 	async function submitLogin(event) {
 		event.preventDefault();
 		notice = '';
+		showInvalidCredentials = false;
 		isSubmitting = true;
 
 		const result = await signInEmail(loginEmail, loginPassword);
@@ -47,12 +49,15 @@
 		if (result.ok) {
 			notice = 'Welcome back. Redirecting to your account...';
 			setTimeout(() => goto(resolve('/account')), 350);
+		} else {
+			showInvalidCredentials = true;
 		}
 	}
 
 	async function submitSignup(event) {
 		event.preventDefault();
 		notice = '';
+		showInvalidCredentials = false;
 
 		if (signupPassword !== signupConfirmPassword) {
 			notice = 'Passwords do not match.';
@@ -88,10 +93,26 @@
 
 		<section class="auth-panel elevated">
 			<div class="mode-switch">
-				<button type="button" class:active={mode === 'login'} onclick={() => (mode = 'login')}>
+				<button
+					type="button"
+					class:active={mode === 'login'}
+					onclick={() => {
+						mode = 'login';
+						notice = '';
+						showInvalidCredentials = false;
+					}}
+				>
 					🔐 Login
 				</button>
-				<button type="button" class:active={mode === 'signup'} onclick={() => (mode = 'signup')}>
+				<button
+					type="button"
+					class:active={mode === 'signup'}
+					onclick={() => {
+						mode = 'signup';
+						notice = '';
+						showInvalidCredentials = false;
+					}}
+				>
 					✨ Create Account
 				</button>
 			</div>
@@ -134,10 +155,24 @@
 				</form>
 			{/if}
 
+			<div class="disclaimer">
+				<p>
+					By {mode === 'login' ? 'logging in' : 'creating an account'}, you agree to our 
+					<a href="/privacy-policy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>. 
+					We securely store your email for account access and collect anonymous telemetry data to improve your experience.
+				</p>
+			</div>
+
 			{#if notice}
 				<p class="notice">{notice}</p>
 			{/if}
-			{#if $authError}
+			{#if showInvalidCredentials}
+				<div class="error credentials-error">
+					<p>Incorrect email or password. Your credentials did not match an existing account.</p>
+					<a class="signup-link-button" href={resolve('/auth?mode=signup')}>Create an account</a>
+				</div>
+			{/if}
+			{#if $authError && !showInvalidCredentials}
 				<p class="error">{$authError}</p>
 			{/if}
 		</section>
@@ -325,6 +360,56 @@
 		background: rgba(241, 58, 55, 0.14);
 		border: 1px solid rgba(241, 58, 55, 0.32);
 		color: #ffc8c6;
+	}
+
+	.credentials-error {
+		display: grid;
+		gap: 0.7rem;
+	}
+
+	.credentials-error p {
+		margin: 0;
+	}
+
+	.signup-link-button {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: fit-content;
+		padding: 0.5rem 0.8rem;
+		border-radius: 10px;
+		border: 1px solid rgba(241, 58, 55, 0.44);
+		background: rgba(241, 58, 55, 0.2);
+		color: #ffe6e5;
+		text-decoration: none;
+		font-weight: 700;
+	}
+
+	.signup-link-button:hover {
+		background: rgba(241, 58, 55, 0.28);
+	}
+
+	.disclaimer {
+		margin-top: 1rem;
+		padding-top: 1rem;
+		border-top: 1px solid rgba(255, 255, 255, 0.1);
+	}
+
+	.disclaimer p {
+		font-size: 0.75rem;
+		color: #94a3b8;
+		line-height: 1.4;
+		text-align: center;
+		margin: 0;
+	}
+
+	.disclaimer a {
+		color: #4ECDC4;
+		text-decoration: none;
+	}
+
+	.disclaimer a:hover {
+		text-decoration: underline;
 	}
 
 	@keyframes rise {

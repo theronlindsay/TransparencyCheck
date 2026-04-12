@@ -1,5 +1,6 @@
 <script>
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import posthog from 'posthog-js';
 
 	// Props for bill data
@@ -67,7 +68,7 @@
 			onclick();
 		} else {
 			// Default behavior: navigate to bill detail page
-			goto(`/bill/${id}`);
+			goto(resolve(`/bill/${id}`));
 		}
 	}
 
@@ -134,26 +135,28 @@
 <style>
 	.bill-card {
 		position: relative;
-		background: var(--bg-secondary);
-		border: 1px solid var(--border-color);
+		background: var(--surface-3d-gradient);
+		border: 1px solid rgba(255, 255, 255, 0.09);
 		border-radius: var(--radius-lg);
 		padding: 1.25rem;
 		transition: all var(--transition-spring);
 		cursor: pointer;
 		overflow: hidden;
 		backdrop-filter: var(--blur);
-		box-shadow: var(--shadow-soft);
+		box-shadow: var(--shadow-3d-stack);
 		display: flex;
 		flex-direction: column;
 		justify-content: space-between;
+		transform: translateZ(0);
 	}
 
 	.bill-card:hover {
-		transform: translateY(-4px);
-		border-color: rgba(241, 58, 55, 0.3);
+		transform: translateY(-4px) translateZ(0);
+		border-color: rgba(241, 58, 55, 0.35);
 		box-shadow:
-			0 20px 40px rgba(0, 0, 0, 0.4),
-			0 0 0 1px rgba(241, 58, 55, 0.2);
+			var(--shadow-3d-inset-top),
+			0 22px 44px rgba(0, 0, 0, 0.45),
+			0 0 0 1px rgba(241, 58, 55, 0.22);
 	}
 
 	.bill-card:focus {

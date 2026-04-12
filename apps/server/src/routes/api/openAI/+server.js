@@ -1,8 +1,10 @@
 import { json } from '@sveltejs/kit';
 import { OpenAI } from 'openai';
 import { env } from '$env/dynamic/private';
+import { getAuth } from '$lib/auth.js';
 
 const OPENAI_API_KEY = env.OPENAI_API_KEY;
+const OPENROUTER_API_KEY = env.OPENROUTER_API_KEY || OPENAI_API_KEY;
 
 // Server-side validation rules
 function validateRequest(prompt, requestData) {
@@ -54,7 +56,6 @@ function validateRequest(prompt, requestData) {
 					errors.push('Each tool must have a valid type');
 					break;
 				}
-				// Only allow specific tool types (OpenAI Responses API)
 				const allowedToolTypes = ['web_search_preview', 'function'];
 				if (!allowedToolTypes.includes(tool.type)) {
 					errors.push(`Invalid tool type: ${tool.type}`);
@@ -95,12 +96,33 @@ function validateRequest(prompt, requestData) {
 	};
 }
 
+function resolveSubscriptionTier(sessionResponse) {
+	const user =
+		sessionResponse?.user ||
+		sessionResponse?.data?.user ||
+		sessionResponse?.session?.user;
+	if (user) {
+		return user.additionalFields?.subscriptionTier || 'free';
+	}
+	return 'free';
+}
+
 export async function POST({ request }) {
 	try {
-		//wait for the prompt, optional tools, and optional conversation ID
+		const auth = await getAuth();
+		const headers = new Headers();
+		request.headers.forEach((value, key) => headers.set(key, value));
+
+		let subscriptionTier = 'free';
+		try {
+			const sessionResponse = await auth.api.getSession({ headers });
+			subscriptionTier = resolveSubscriptionTier(sessionResponse);
+		} catch (sessionErr) {
+			console.warn('[openAI] getSession failed, using free tier:', sessionErr?.message || sessionErr);
+		}
+
 		const { prompt, tools, conversationId } = await request.json();
 
-		// Server-side validation
 		const validation = validateRequest(prompt, { tools });
 		if (!validation.isValid) {
 			console.error('Validation failed:', validation.errors);
@@ -114,29 +136,56 @@ export async function POST({ request }) {
 			);
 		}
 
-		// Call requestAI function and get the response
-		const result = await requestAI(prompt, tools, conversationId);
+		const result = await requestAI(prompt, tools, conversationId, subscriptionTier);
 
-		return json(
-			{
-				success: true,
-				response: result.text,
-				conversationId: result.conversationId,
-				prompt
-			}
-		);
+		return json({
+			success: true,
+			response: result.text,
+			conversationId: result.conversationId,
+			prompt
+		});
 	} catch (error) {
 		console.error('Error in openAI endpoint:', error);
 		return json({ error: error.message, success: false }, { status: 500 });
 	}
 }
 
-async function requestAI(prompt, tools, conversationId = null) {
-	const client = new OpenAI({
-		apiKey: OPENAI_API_KEY
-	});
+async function requestAI(prompt, tools, conversationId = null, tier = 'free') {
+	const isPro = tier === 'pro';
 
-	console.log('Prompt:', prompt);
+	if (isPro && !OPENAI_API_KEY?.trim()) {
+		throw new Error('OpenAI API key is not configured for Pro tier.');
+	}
+	if (!isPro && !OPENROUTER_API_KEY?.trim()) {
+		throw new Error(
+			'No API key configured for free tier. Set OPENROUTER_API_KEY (or OPENAI_API_KEY as fallback) on the server.'
+		);
+	}
+
+	if (!isPro) {
+		const client = new OpenAI({
+			apiKey: OPENROUTER_API_KEY,
+			baseURL: 'https://openrouter.ai/api/v1',
+			defaultHeaders: {
+				'HTTP-Referer': 'https://transparencycheck.app',
+				'X-Title': 'TransparencyCheck'
+			}
+		});
+
+		const response = await client.chat.completions.create({
+			model: 'openrouter/free',
+			messages: [{ role: 'user', content: prompt }]
+		});
+
+		return {
+			text: response.choices[0].message.content,
+			conversationId: response.id
+		};
+	}
+
+	const client = new OpenAI({ apiKey: OPENAI_API_KEY });
+
+	console.log('Prompt (Pro):', prompt);
 	if (tools) {
 		console.log('Tools enabled:', tools);
 	}
@@ -149,12 +198,10 @@ async function requestAI(prompt, tools, conversationId = null) {
 		input: prompt
 	};
 
-	// Add tools if provided (Responses API supports web_search_preview, etc.)
 	if (tools && Array.isArray(tools) && tools.length > 0) {
 		requestOptions.tools = tools;
 	}
 
-	// Continue conversation if conversationId provided
 	if (conversationId) {
 		requestOptions.previous_response_id = conversationId;
 	}
@@ -163,7 +210,6 @@ async function requestAI(prompt, tools, conversationId = null) {
 
 	console.log('OpenAI Response:', response);
 
-	// Extract the text content and conversation ID from the Responses API output
 	const outputText = response.output_text || '';
 	return {
 		text: outputText,

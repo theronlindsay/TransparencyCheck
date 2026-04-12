@@ -28,14 +28,18 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each data.bills as bill}
+					{#each data.bills as bill (bill.number ?? bill.id ?? bill.title)}
 						<tr>
 							<td class="bill-number">{bill.number}</td>
 							<td class="bill-title">
 								{#if bill.fullTextUrl}
-									<a href={bill.fullTextUrl} target="_blank" rel="noopener noreferrer">
+									<button
+										type="button"
+										class="title-external-link"
+										onclick={() => window.open(bill.fullTextUrl, '_blank', 'noopener,noreferrer')}
+									>
 										{bill.title}
-									</a>
+									</button>
 								{:else}
 									{bill.title}
 								{/if}
@@ -110,13 +114,20 @@
 		color: var(--text-primary);
 	}
 
-	.bill-title a {
+	.title-external-link {
+		margin: 0;
+		padding: 0;
+		border: none;
+		background: none;
+		cursor: pointer;
 		color: var(--accent);
+		font: inherit;
+		text-align: left;
 		text-decoration: none;
 		transition: color var(--transition-base);
 	}
 
-	.bill-title a:hover {
+	.title-external-link:hover {
 		color: #ff5b58;
 		text-decoration: underline;
 	}

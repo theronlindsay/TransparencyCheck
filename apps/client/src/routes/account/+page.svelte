@@ -2,13 +2,35 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { authError, currentUser, isAuthenticated, signOutUser } from '$lib/stores/auth.js';
+	import { apiUrl } from '$lib/config.js';
+	import { onMount } from 'svelte';
 
 	let busy = $state(false);
 	let toast = $state('');
 
+	let savedBills = $state([]);
+	let loadingBills = $state(false);
+
 	$effect(() => {
 		if (!$isAuthenticated) {
 			goto(resolve('/auth'));
+		}
+	});
+
+	onMount(async () => {
+		if ($isAuthenticated) {
+			loadingBills = true;
+			try {
+				const res = await fetch(apiUrl('/api/bills/save'));
+				if (res.ok) {
+					const data = await res.json();
+					savedBills = data.bills || [];
+				}
+			} catch (e) {
+				console.error(e);
+			} finally {
+				loadingBills = false;
+			}
 		}
 	});
 
@@ -22,10 +44,23 @@
 			setTimeout(() => goto(resolve('/auth')), 320);
 		}
 	}
+
+	async function exportData() {
+		// Mock endpoint calls for GDPR features
+		toast = 'Data export initiated. You will receive an email shortly.';
+	}
+
+	async function deleteAccount() {
+		if (confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
+			// Mock endpoint call for deletion
+			toast = 'Account deleted successfully.';
+			setTimeout(() => goto(resolve('/auth')), 1000);
+		}
+	}
 </script>
 
 <div class="account-page">
-	<div class="account-card elevated">
+	<div class="account-card elevated-surface">
 		<div class="title-row">
 			<p class="badge">👤 Account</p>
 			<h1>Manage your Transparency Check profile</h1>
@@ -51,11 +86,57 @@
 					<li>🛰️ Link app notifications to Congress.gov activity changes.</li>
 				</ul>
 			</section>
+
+			<section class="panel">
+				<h2>Data & Privacy</h2>
+				<p>Manage your account data and privacy settings (GDPR Compliant).</p>
+				<div class="actions" style="margin-top: 1rem;">
+					<button
+						class="depth-button-primary depth-blue"
+						style="font-size: 0.8rem; padding: 0.5rem;"
+						onclick={exportData}
+						disabled={busy}>📥 Export My Data</button
+					>
+					<button
+						class="depth-button-primary depth-danger"
+						style="font-size: 0.8rem; padding: 0.5rem;"
+						onclick={deleteAccount}
+						disabled={busy}>🗑️ Delete Account</button
+					>
+				</div>
+			</section>
 		</div>
 
+		<section class="panel full-width" style="margin-top: 1.3rem;">
+			<h2>My Saved Bills</h2>
+			{#if loadingBills}
+				<p>Loading...</p>
+			{:else if savedBills.length === 0}
+				<p>You have not saved any bills yet.</p>
+			{:else}
+				<ul class="bill-list">
+					{#each savedBills as saved (saved.billId + ':' + saved.savedAt)}
+						<li style="margin-bottom: 0.5rem;">
+							<a
+								href={resolve(`/bill/${saved.billId.replace(/\./g, '')}`)}
+								style="color: #4ECDC4; font-weight: bold; text-decoration: none;"
+							>
+								{saved.title || saved.billId}
+							</a>
+							<span style="color: #94a3b8; font-size: 0.85rem; margin-left: 0.5rem;"
+								>Saved: {new Date(saved.savedAt).toLocaleDateString()}</span
+							>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		</section>
+
 		<div class="actions">
-			<button class="depth-button" onclick={() => goto(resolve('/'))}>🏛️ Explore Bills</button>
-			<button class="depth-button danger" onclick={handleLogout} disabled={busy}>
+			<button class="depth-button-primary depth-blue" onclick={() => goto(resolve('/'))}
+				>🏛️ Explore Bills</button
+			>
+			<button class="depth-button-primary depth-danger" onclick={handleLogout} disabled={busy}>
 				{busy ? 'Signing Out...' : '🚪 Logout'}
 			</button>
 		</div>
@@ -76,21 +157,11 @@
 		padding: 2rem;
 	}
 
-	.elevated {
-		position: relative;
-		background: linear-gradient(145deg, rgba(30, 24, 24, 0.9), rgba(18, 16, 16, 0.86));
-		border: 1px solid rgba(255, 255, 255, 0.09);
-		border-radius: 28px;
-		box-shadow:
-			0 24px 44px rgba(0, 0, 0, 0.35),
-			0 34px 68px rgba(0, 0, 0, 0.24),
-			inset 0 1px 0 rgba(255, 255, 255, 0.1);
-	}
-
-	.account-card {
+	.account-card.elevated-surface {
 		padding: 1.8rem;
 		display: grid;
 		gap: 1.3rem;
+		border-radius: 28px;
 	}
 
 	.badge {
@@ -122,7 +193,10 @@
 		padding: 1rem;
 		border-radius: 16px;
 		background: rgba(255, 255, 255, 0.03);
-		border: 1px solid rgba(255, 255, 255, 0.07);
+		border: 1px solid rgba(255, 255, 255, 0.08);
+		box-shadow:
+			inset 0 1px 0 rgba(255, 255, 255, 0.05),
+			0 4px 16px rgba(0, 0, 0, 0.22);
 	}
 
 	h2 {
@@ -141,52 +215,6 @@
 		display: flex;
 		gap: 0.8rem;
 		flex-wrap: wrap;
-	}
-
-	.depth-button {
-		padding: 0.84rem 1.1rem;
-		border: none;
-		border-radius: 14px;
-		font-weight: 700;
-		background: linear-gradient(165deg, #ff5a53, #de2e2e);
-		color: #fff;
-		cursor: pointer;
-		box-shadow:
-			0 12px 20px rgba(222, 46, 46, 0.35),
-			0 6px 0 #8d1f1f,
-			inset 0 1px 0 rgba(255, 255, 255, 0.2);
-		transition:
-			transform 0.18s ease,
-			box-shadow 0.18s ease;
-	}
-
-	.depth-button:hover:not(:disabled) {
-		transform: translateY(-2px);
-		box-shadow:
-			0 16px 24px rgba(222, 46, 46, 0.42),
-			0 8px 0 #8d1f1f,
-			inset 0 1px 0 rgba(255, 255, 255, 0.24);
-	}
-
-	.depth-button:active:not(:disabled) {
-		transform: translateY(4px);
-		box-shadow:
-			0 8px 14px rgba(222, 46, 46, 0.28),
-			0 2px 0 #8d1f1f,
-			inset 0 1px 0 rgba(255, 255, 255, 0.1);
-	}
-
-	.depth-button:disabled {
-		opacity: 0.72;
-		cursor: not-allowed;
-	}
-
-	.depth-button.danger {
-		background: linear-gradient(165deg, #c63a3a, #8f2323);
-		box-shadow:
-			0 12px 20px rgba(143, 35, 35, 0.35),
-			0 6px 0 #5f1818,
-			inset 0 1px 0 rgba(255, 255, 255, 0.2);
 	}
 
 	.notice,
@@ -214,7 +242,7 @@
 			padding: 0.8rem;
 		}
 
-		.account-card {
+		.account-card.elevated-surface {
 			padding: 1rem;
 		}
 

@@ -5,6 +5,7 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import BottomTabBar from '$lib/Components/BottomTabBar.svelte';
 	import AIAssistant from '$lib/Components/AIAssistant.svelte';
+	import CookieConsent from '$lib/Components/CookieConsent.svelte';
 	import { refreshSession } from '$lib/stores/auth.js';
 	import { pwaInfo } from 'virtual:pwa-info';
 	import '../lib/styles/theme.css';
@@ -90,6 +91,7 @@
 
 	<AIAssistant />
 	<BottomTabBar />
+	<CookieConsent />
 </div>
 
 <style>
@@ -135,6 +137,7 @@
 		flex-direction: row;
 		align-items: center;
 		justify-content: space-between;
+		gap: 1.5rem;
 		padding: env(safe-area-inset-top) 0 0 0;
 	}
 

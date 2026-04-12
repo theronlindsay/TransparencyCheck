@@ -2,6 +2,7 @@ import { MongoClient } from 'mongodb';
 
 let client;
 let clientPromise;
+let loggedConnected = false;
 
 export async function mongo() {
     const uri = process.env.DATABASE_URL;
@@ -17,7 +18,10 @@ export async function mongo() {
         }
 
         const connectedClient = await clientPromise;
-        console.log('MongoDB connected');
+        if (!loggedConnected) {
+            loggedConnected = true;
+            console.log('MongoDB connected');
+        }
         return connectedClient.db();
     } catch (error) {
         clientPromise = undefined;
