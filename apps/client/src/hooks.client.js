@@ -1,4 +1,4 @@
-import posthog from 'posthog-js/dist/module.no-external';
+import posthog from 'posthog-js';
 
 // Initialize PostHog when the app starts in the browser
 export async function init() {
@@ -6,8 +6,6 @@ export async function init() {
 		api_host: 'https://a.transparencycheck.app',
 		defaults: '2026-01-30',
 		capture_exceptions: true,
-		// Keep replay enabled but avoid blocked external recorder script requests.
-		disable_external_dependency_loading: true,
 		disable_session_recording: false,
 		// GDPR Compliance: Wait for active consent
 		opt_out_capturing_by_default: true
