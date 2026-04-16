@@ -180,8 +180,13 @@ export async function GET() {
 					let fecId;
 					try {
 						fecId = await lookupFecCandidateId(nameForSearch, fecKey, {
-							bioguideId: member.bioguideId,
-							source: 'representatives'
+							state: member.state,
+							branch: chamber,
+							party: member.partyName,
+							logContext: {
+								bioguideId: member.bioguideId,
+								source: 'representatives'
+							}
 						});
 					} catch (e) {
 						if (e instanceof OpenFECRateLimitError) {

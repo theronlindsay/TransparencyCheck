@@ -52,8 +52,13 @@ export async function GET({ params }) {
             if (!hasStoredFecCandidateId(memberData.fec_candidate_id) && memberData.fullName && fecKey) {
                 try {
                     const resolved = await lookupFecCandidateId(memberData.fullName, fecKey, {
-                        bioguideId,
-                        source: 'politician-basic'
+                        state: memberData.state,
+                        branch: memberData.branch,
+                        party: memberData.party,
+                        logContext: {
+                            bioguideId,
+                            source: 'politician-basic'
+                        }
                     });
                     if (resolved) {
                         await Person.updateOne({ _id: bioguideId }, { $set: { fec_candidate_id: resolved } });
@@ -118,8 +123,13 @@ export async function GET({ params }) {
                     if (!hasStoredFecCandidateId(merged.fec_candidate_id) && merged.fullName && fecKeyFallback) {
                         try {
                             const resolved = await lookupFecCandidateId(merged.fullName, fecKeyFallback, {
-                                bioguideId,
-                                source: 'politician-basic-fallback'
+                                state: merged.state,
+                                branch: merged.branch,
+                                party: merged.party,
+                                logContext: {
+                                    bioguideId,
+                                    source: 'politician-basic-fallback'
+                                }
                             });
                             if (resolved) {
                                 await Person.updateOne({ _id: bioguideId }, { $set: { fec_candidate_id: resolved } });

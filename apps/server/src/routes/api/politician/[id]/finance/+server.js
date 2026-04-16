@@ -59,7 +59,7 @@ export async function GET({ params, url }) {
             donorAggVersion: profile?.donorAggVersion ?? null
         });
 
-        const personLean = await Person.findById(bioguideId).select('fec_candidate_id').lean();
+        const personLean = await Person.findById(bioguideId).select('fec_candidate_id fullName state branch party').lean();
         const storedFecId = hasStoredFecCandidateId(personLean?.fec_candidate_id)
             ? personLean.fec_candidate_id.trim()
             : null;
@@ -74,8 +74,13 @@ export async function GET({ params, url }) {
             console.log('[FINANCE API] OpenFEC candidate search', { bioguideId, nameSnippet: name.slice(0, 60) });
             try {
                 fallbackFecId = await lookupFecCandidateId(name, fecKey, {
-                    bioguideId,
-                    source: 'politician-finance'
+                    state: personLean?.state,
+                    branch: personLean?.branch,
+                    party: personLean?.party,
+                    logContext: {
+                        bioguideId,
+                        source: 'politician-finance'
+                    }
                 });
                 fecIdFromNameLookup = Boolean(fallbackFecId);
             } catch (lookupErr) {

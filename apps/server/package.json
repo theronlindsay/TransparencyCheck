@@ -8,9 +8,12 @@
 		"build": "vite build",
 		"preview": "vite preview",
 		"start": "bun ./build",
+		"test": "node --test src/lib/openfec-candidate-match.test.js",
 		"prepare": "svelte-kit sync || echo ''",
 		"format": "prettier --write .",
 		"lint": "prettier --check . && eslint .",
+		"fec:duplicates": "node repair-fec-candidate-ids.js",
+		"fec:repair": "node repair-fec-candidate-ids.js --apply",
 		"cron:stocks": "curl -sS \"http://localhost:3000/api/cron/sync-stocks?secret=dev_secret\"",
 		"cron:sync-finance": "curl -sS \"http://localhost:3000/api/cron/sync-finance?secret=dev_secret\""
 	},

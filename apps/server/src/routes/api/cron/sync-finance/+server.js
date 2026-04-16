@@ -106,8 +106,13 @@ export async function GET({ request, url }) {
                     // If missing in DB, find via OpenFEC name search (skip if already stored)
                     if (!hasStoredFecCandidateId(fecId) && rep.fullName) {
                         fecId = await lookupFecCandidateId(rep.fullName, fecKey, {
-                            bioguideId: bid,
-                            source: 'cron-sync-finance'
+                            state: rep.state,
+                            branch: rep.branch,
+                            party: rep.party,
+                            logContext: {
+                                bioguideId: bid,
+                                source: 'cron-sync-finance'
+                            }
                         });
                         if (fecId) {
                             await Person.updateOne({ _id: bid }, { $set: { fec_candidate_id: fecId } });
