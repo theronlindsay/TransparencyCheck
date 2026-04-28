@@ -9,11 +9,34 @@
 	let stockData = $state(null);
 	let error = $state(null);
 	let activeTab = $state('overview');
+	let financeScope = $state('authorized');
 	let loadingProfile = $state(true);
-	let loadingFinance = $state(false);
+	let loadingFinance = $state(true);
 	let loadingStocks = $state(false);
 
 	const politicianId = $page.params.id;
+
+	async function loadFinanceData(scope = financeScope) {
+		loadingFinance = true;
+		try {
+			const financeRes = await fetch(
+				apiUrl(
+					`/api/politician/${politicianId}/finance?committeeScope=${encodeURIComponent(scope)}`
+				)
+			);
+			if (!financeRes.ok) {
+				throw new Error('Failed to load finance data');
+			}
+
+			financeData = await financeRes.json();
+			financeScope = financeData?.selectedScope || scope;
+		} catch (err) {
+			console.error('Error fetching finance data:', err);
+			error = 'Failed to load campaign finance data.';
+		} finally {
+			loadingFinance = false;
+		}
+	}
 
 	onMount(async () => {
 		loadingProfile = true;
@@ -23,67 +46,11 @@
 				throw new Error('Failed to load basic politician info');
 			}
 			politician = await basicRes.json();
+			financeData = { totals: null, donors: [], includedCommittees: [] };
+			stockData = politician.stockData?.trades ?? [];
 			loadingProfile = false;
-
-			loadingFinance = true;
-			loadingStocks = true;
-
-			let finUrl = `/api/politician/${politicianId}/finance`;
-			if (politician.fec_candidate_id) {
-				finUrl += `?fec_candidate_id=${encodeURIComponent(politician.fec_candidate_id)}`;
-			} else if (politician.name) {
-				finUrl += `?name=${encodeURIComponent(politician.name)}`;
-			}
-
-			console.log('[member] fetching finance', {
-				politicianId,
-				fec_candidate_id: politician.fec_candidate_id ?? null,
-				hasNameQuery: Boolean(politician.name)
-			});
-
-			const financePromise = fetch(apiUrl(finUrl)).then(async (finRes) => {
-				if (finRes.ok) return await finRes.json();
-				console.warn('[member] finance request failed', { politicianId, status: finRes.status });
-				return { totals: null, donors: [] };
-			});
-
-			let stocksPromise;
-			if (politician.name) {
-				console.log('[member] fetching stocks', { politicianId, name: politician.name });
-				stocksPromise = fetch(
-					apiUrl(
-						`/api/politician/${politicianId}/stocks?name=${encodeURIComponent(politician.name)}`
-					)
-				).then(async (stockRes) => {
-					if (stockRes.ok) {
-						const data = await stockRes.json();
-						const list = data.stocks ?? [];
-						console.log('[member] stocks response', {
-							politicianId,
-							tradeCount: list.length
-						});
-						return list;
-					}
-					console.warn('[member] stocks request failed', {
-						politicianId,
-						status: stockRes.status
-					});
-					return [];
-				});
-			} else {
-				console.log('[member] skipping stocks (no politician name)', { politicianId });
-				stocksPromise = Promise.resolve([]);
-			}
-
-			const [fin, stocks] = await Promise.all([financePromise, stocksPromise]);
-			console.log('[member] finance response', {
-				politicianId,
-				donorCount: Array.isArray(fin?.donors) ? fin.donors.length : 0
-			});
-			financeData = fin;
-			stockData = stocks;
-			loadingFinance = false;
 			loadingStocks = false;
+			await loadFinanceData(financeScope);
 		} catch (err) {
 			console.error('Error fetching member page data:', err);
 			error = 'Failed to load politician data.';
@@ -167,18 +134,32 @@
 					{#if politician.sponsoredBills && politician.sponsoredBills.length > 0}
 						<h3 class="sponsored-header">Recent Sponsored Legislation</h3>
 						<div class="bills-list">
-							{#each politician.sponsoredBills as bill (bill.number || bill.displayTitle || '')}
-								<a href={resolve(`/bill/${bill.number}`)} class="bill-card">
-									<div class="bill-header">
-										<span class="bill-number">{(bill.number || '').toString().toUpperCase()}</span>
-										<span class="bill-date"
-											>{bill.introducedDate
-												? new Date(bill.introducedDate).toLocaleDateString()
-												: '—'}</span
-										>
+							{#each politician.sponsoredBills as bill (bill.billId || bill.displayTitle || '')}
+								{#if bill.billId}
+									<a href={resolve(`/bill/${bill.billId}`)} class="bill-card">
+										<div class="bill-header">
+											<span class="bill-number">{bill.billId.toString().toUpperCase()}</span>
+											<span class="bill-date"
+												>{bill.introducedDate
+													? new Date(bill.introducedDate).toLocaleDateString()
+													: '—'}</span
+											>
+										</div>
+										<p class="bill-title">{bill.displayTitle}</p>
+									</a>
+								{:else}
+									<div class="bill-card missing-link">
+										<div class="bill-header">
+											<span class="bill-number">Cached Bill</span>
+											<span class="bill-date"
+												>{bill.introducedDate
+													? new Date(bill.introducedDate).toLocaleDateString()
+													: '—'}</span
+											>
+										</div>
+										<p class="bill-title">{bill.displayTitle}</p>
 									</div>
-									<p class="bill-title">{bill.displayTitle}</p>
-								</a>
+								{/if}
 							{/each}
 						</div>
 					{/if}
@@ -206,10 +187,42 @@
 							</div>
 						{/if}
 
+						<div class="finance-controls">
+							<label>
+								<span>Committee scope</span>
+								<select
+									value={financeScope}
+									onchange={async (event) => {
+										await loadFinanceData(event.currentTarget.value);
+									}}
+								>
+									<option value="authorized">Principal + all authorized</option>
+									<option value="principal">Principal committee only</option>
+								</select>
+							</label>
+
+							{#if financeData?.lastSyncedAt}
+								<p class="finance-meta">
+									Last synced: {new Date(financeData.lastSyncedAt).toLocaleString()}
+								</p>
+							{/if}
+						</div>
+
+						{#if financeData?.includedCommittees?.length}
+							<div class="committee-chips">
+								{#each financeData.includedCommittees as committee (committee.committeeId)}
+									<span class="committee-chip">
+										{committee.name}
+										<small>{committee.designation || '—'}</small>
+									</span>
+								{/each}
+							</div>
+						{/if}
+
 						<h3>Top donors (last several two-year cycles)</h3>
 						<p class="donor-note">
-							Amounts combine itemized contributions by donor name across recent FEC reporting
-							periods.
+							Amounts combine committee-level Schedule A contribution rows by donor name across
+							recent FEC reporting periods for the selected committee scope.
 						</p>
 						{#if financeData?.donors && financeData.donors.length > 0}
 							<div class="donor-table-wrap">
@@ -287,6 +300,8 @@
 		margin: 0 auto;
 		padding: 2rem;
 		color: var(--text-primary);
+		width: 100%;
+		overflow-x: clip;
 	}
 
 	.loading-state,
@@ -299,6 +314,57 @@
 		text-align: center;
 		color: var(--text-secondary);
 		padding: 2rem 1rem;
+	}
+
+	.finance-controls {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: end;
+		justify-content: space-between;
+		gap: 1rem;
+		margin: 1rem 0 1.25rem;
+	}
+
+	.finance-controls label {
+		display: grid;
+		gap: 0.45rem;
+		font-weight: 600;
+	}
+
+	.finance-controls select {
+		padding: 0.65rem 0.9rem;
+		border-radius: 0.75rem;
+		border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+		background: var(--surface-elevated, rgba(255, 255, 255, 0.06));
+		color: inherit;
+		font: inherit;
+	}
+
+	.finance-meta {
+		margin: 0;
+		color: var(--text-secondary);
+	}
+
+	.committee-chips {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.6rem;
+		margin-bottom: 1rem;
+	}
+
+	.committee-chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45rem;
+		padding: 0.45rem 0.7rem;
+		border-radius: 999px;
+		background: var(--surface-elevated, rgba(255, 255, 255, 0.06));
+		color: var(--text-secondary);
+		font-size: 0.9rem;
+	}
+
+	.committee-chip small {
+		opacity: 0.75;
 	}
 
 	.full-page-loading {
@@ -476,6 +542,7 @@
 		width: 100%;
 		border-collapse: collapse;
 		margin-top: 1rem;
+		table-layout: fixed;
 	}
 
 	.data-table th,
@@ -483,6 +550,8 @@
 		padding: 1rem;
 		text-align: left;
 		border-bottom: 1px solid var(--border-color);
+		overflow-wrap: anywhere;
+		word-break: break-word;
 	}
 
 	.data-table th {
@@ -547,6 +616,12 @@
 
 	.donor-table-wrap {
 		margin-top: 0.5rem;
+		width: 100%;
+		max-width: 100%;
+		overflow-x: auto;
+		overflow-y: hidden;
+		-webkit-overflow-scrolling: touch;
+		overscroll-behavior-x: contain;
 	}
 
 	.donor-table-wrap .data-table {
@@ -574,6 +649,10 @@
 		text-decoration: none;
 		transition: all var(--transition-base);
 		display: block;
+	}
+
+	.bill-card.missing-link {
+		cursor: default;
 	}
 
 	.bill-card:hover {
@@ -662,6 +741,50 @@
 
 		.profile-header .social-links a {
 			font-size: 0.78rem;
+		}
+
+		.finance-controls {
+			align-items: stretch;
+		}
+
+		.finance-controls label,
+		.finance-controls select {
+			width: 100%;
+		}
+
+		.donor-table-wrap {
+			margin-left: -0.15rem;
+			margin-right: -0.15rem;
+		}
+
+		.donor-table-wrap .data-table {
+			min-width: 0;
+		}
+
+		.donor-table-wrap .data-table th,
+		.donor-table-wrap .data-table td {
+			padding: 0.7rem 0.45rem;
+			font-size: 0.78rem;
+			line-height: 1.3;
+		}
+
+		.donor-table-wrap .data-table th:nth-child(1),
+		.donor-table-wrap .data-table td:nth-child(1) {
+			width: 46%;
+		}
+
+		.donor-table-wrap .data-table th:nth-child(2),
+		.donor-table-wrap .data-table td:nth-child(2) {
+			width: 29%;
+		}
+
+		.donor-table-wrap .data-table th:nth-child(3),
+		.donor-table-wrap .data-table td:nth-child(3) {
+			width: 25%;
+		}
+
+		.donor-table-wrap .data-table .amount {
+			font-size: 0.82rem;
 		}
 	}
 </style>

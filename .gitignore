@@ -53,6 +53,8 @@ pdf_cache/
 .idea/
 
 .cache
+logs
+apps/server/logs
 
 #android builds
 android

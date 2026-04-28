@@ -1,5 +1,6 @@
 import { StockTrade } from '$lib/db/models/StockTrade.js';
 import Person from '$lib/db/models/Person.js';
+import { emptyStockData } from '$lib/server/person-cache.js';
 
 /**
  * FMP `/stable/*` congressional endpoints (not legacy `/api/v4/senate-*`, which 403 for post–Aug 2025 accounts).
@@ -70,6 +71,13 @@ function fmpRequestHeaders(apiKey) {
 	};
 }
 
+function truncateLogSnippet(value, max = 280) {
+	return String(value || '')
+		.replace(/\s+/g, ' ')
+		.trim()
+		.slice(0, max);
+}
+
 /**
  * FMP free/low tiers often:
  * - cap `limit` at 25 (HTTP 402 if higher) — override with FMP_STOCK_PAGE_LIMIT
@@ -125,7 +133,9 @@ async function fetchFmpPaginatedStable(path, name, fmpKey, { maxPages, limit }) 
 
 		let parsed;
 		try {
-			parsed = await fRes.json();
+			const bodyText = await fRes.text();
+			bodySnippet = truncateLogSnippet(bodyText, 500);
+			parsed = bodyText ? JSON.parse(bodyText) : null;
 		} catch {
 			endpointResults.push({
 				name: `${name} page=${page}`,
@@ -153,7 +163,8 @@ async function fetchFmpPaginatedStable(path, name, fmpKey, { maxPages, limit }) 
 			name: `${name} page=${page}`,
 			ok: true,
 			rows: pageRows.length,
-			httpStatus: fRes.status
+			httpStatus: fRes.status,
+			bodySnippet
 		});
 		if (pageRows.length === 0) break;
 		rows.push(...pageRows);
@@ -178,12 +189,7 @@ export async function syncFmpStockTrades(nameToIdMap, fmpKey) {
 		key,
 		pageOpts
 	);
-	const house = await fetchFmpPaginatedStable(
-		'house-latest',
-		'stable/house-latest',
-		key,
-		pageOpts
-	);
+	const house = await fetchFmpPaginatedStable('house-latest', 'stable/house-latest', key, pageOpts);
 
 	const allTrades = [...senate.rows, ...house.rows];
 	const endpointResults = [...senate.endpointResults, ...house.endpointResults];
@@ -243,8 +249,7 @@ export async function syncFmpStockTrades(nameToIdMap, fmpKey) {
 		});
 	}
 
-	const everyRequestFailed =
-		endpointResults.length > 0 && endpointResults.every((e) => !e.ok);
+	const everyRequestFailed = endpointResults.length > 0 && endpointResults.every((e) => !e.ok);
 
 	// Only replace the collection when FMP responded successfully enough to build rows.
 	// Never wipe Mongo on failed/partial fetches — keeps the last good local cache.
@@ -253,6 +258,65 @@ export async function syncFmpStockTrades(nameToIdMap, fmpKey) {
 		await StockTrade.deleteMany({});
 		await StockTrade.insertMany(tradeOps);
 		replacedCollection = true;
+	}
+
+	if (!everyRequestFailed) {
+		const allPoliticianIds = [
+			...new Set([...nameToIdMap.values()].map((value) => String(value).toUpperCase()))
+		];
+		const groupedTrades = new Map();
+
+		for (const trade of tradeOps) {
+			const key = String(trade.politicianId).toUpperCase();
+			if (!groupedTrades.has(key)) {
+				groupedTrades.set(key, []);
+			}
+			groupedTrades.get(key).push({
+				ticker: trade.ticker,
+				companyName: trade.companyName,
+				transactionDate: trade.transactionDate,
+				disclosureDate: trade.disclosureDate,
+				transactionType: trade.transactionType,
+				amountRange: trade.amountRange,
+				source: trade.source
+			});
+		}
+
+		const syncedAt = new Date();
+		if (allPoliticianIds.length > 0) {
+			await Person.updateMany(
+				{ _id: { $in: allPoliticianIds } },
+				{
+					$set: {
+						stockData: emptyStockData({
+							trades: [],
+							lastSyncedAt: syncedAt
+						})
+					}
+				}
+			);
+		}
+
+		if (groupedTrades.size > 0) {
+			await Promise.all(
+				[...groupedTrades.entries()].map(async ([politicianId, trades]) => {
+					await Person.updateOne(
+						{ _id: politicianId },
+						{
+							$set: {
+								stockData: emptyStockData({
+									trades: trades.sort(
+										(a, b) =>
+											new Date(b.transactionDate).getTime() - new Date(a.transactionDate).getTime()
+									),
+									lastSyncedAt: syncedAt
+								})
+							}
+						}
+					);
+				})
+			);
+		}
 	}
 
 	const uniquePoliticians = new Set(tradeOps.map((t) => t.politicianId)).size;
@@ -287,7 +351,9 @@ export function logStockSyncSummary(summary) {
 		return;
 	}
 	if (!summary.ok) {
-		console.log('[Stock sync] Failed: all FMP /stable/ requests failed or returned an error payload.');
+		console.log(
+			'[Stock sync] Failed: all FMP /stable/ requests failed or returned an error payload.'
+		);
 		if (summary.fmpPageLimit != null) {
 			console.log(
 				`[Stock sync]   Request limit was: ${summary.fmpPageLimit}/page; max pages/endpoint: ${summary.fmpMaxPagesPerEndpoint ?? '—'}`
@@ -308,7 +374,7 @@ export function logStockSyncSummary(summary) {
 	for (const ep of summary.endpoints) {
 		const status = ep.ok ? 'ok' : 'failed';
 		let line = `[Stock sync]   FMP ${ep.name}: ${status} — ${ep.rows} row(s)${ep.httpStatus ? ` (HTTP ${ep.httpStatus})` : ''}`;
-		if (!ep.ok && ep.bodySnippet) {
+		if (ep.bodySnippet) {
 			line += `\n[Stock sync]     → ${ep.bodySnippet.replace(/\s+/g, ' ').trim()}`;
 		}
 		console.log(line);

@@ -36,6 +36,7 @@ services:
       - DATABASE_URL=mongodb://${MONGO_ROOT_USER:-admin}:${MONGO_ROOT_PASSWORD:-password123}@mongodb:27017/transparency_check?authSource=admin
     volumes:
       - pdf-cache:/app/.cache
+      - server_logs:/app/logs
     ports:
       - "3000:3000"
 
@@ -54,3 +55,4 @@ services:
 volumes:
   pdf-cache:
   mongodb_data:
+  server_logs:

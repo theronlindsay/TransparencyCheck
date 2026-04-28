@@ -1,37 +1,33 @@
 import { json } from '@sveltejs/kit';
 import mongo from '$lib/db/mongo.js';
+import Person from '$lib/db/models/Person.js';
 import { StockTrade } from '$lib/db/models/StockTrade.js';
+import { emptyStockData, normalizeStockData } from '$lib/server/person-cache.js';
 
-export async function GET({ params, url }) {
-    const bioguideId = params.id?.toUpperCase();
-    const nameParam = url.searchParams.get('name');
+export async function GET({ params }) {
+	const bioguideId = params.id?.toUpperCase();
 
-    if (!bioguideId) {
-        return json({ error: 'Missing bioguideId parameter' }, { status: 400 });
-    }
+	if (!bioguideId) {
+		return json({ error: 'Missing bioguideId parameter' }, { status: 400 });
+	}
 
-    console.log('[STOCKS API] attempt', {
-        bioguideId,
-        name: nameParam
-            ? `${nameParam.slice(0, 80)}${nameParam.length > 80 ? '…' : ''}`
-            : null
-    });
+	try {
+		await mongo();
 
-    try {
-        await mongo();
-        
-        // Match regardless of historical casing on politicianId
-        const esc = bioguideId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const stockData = await StockTrade.find({ politicianId: new RegExp(`^${esc}$`, 'i') })
-            .sort({ transactionDate: -1 })
-            .limit(150)
-            .lean();
+		const person = await Person.findById(bioguideId).select('stockData').lean();
+		if (person?.stockData) {
+			return json({ stocks: normalizeStockData(person.stockData).trades });
+		}
 
-        console.log('[STOCKS API] result', { bioguideId, tradeCount: stockData.length });
-        return json({ stocks: stockData });
+		const esc = bioguideId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+		const stockData = await StockTrade.find({ politicianId: new RegExp(`^${esc}$`, 'i') })
+			.sort({ transactionDate: -1 })
+			.limit(150)
+			.lean();
 
-    } catch (err) {
-        console.error('[STOCKS API] DB Error:', err);
-        return json({ error: 'Database error' }, { status: 500 });
-    }
+		return json({ stocks: emptyStockData({ trades: stockData }).trades });
+	} catch (err) {
+		console.error('[STOCKS API] DB Error:', err);
+		return json({ error: 'Database error' }, { status: 500 });
+	}
 }

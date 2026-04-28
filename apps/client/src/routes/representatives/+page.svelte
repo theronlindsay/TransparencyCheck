@@ -94,13 +94,6 @@
 			</div>
 		</header>
 
-		{#if !loading && !error && servedFromCache}
-			<p class="cache-notice" role="status">
-				Showing the saved directory from our database. Live Congress.gov data was unavailable or
-				incomplete, so member details may be slightly out of date until the next successful sync.
-			</p>
-		{/if}
-
 		{#if loading}
 			<div class="loading-state">
 				<div class="spinner"></div>
@@ -168,18 +161,6 @@
 		font-size: 1.75rem;
 		margin: 0 0 0.35rem 0;
 		color: var(--text-primary);
-	}
-
-	.cache-notice {
-		margin: -1.5rem 0 2rem;
-		padding: 0.85rem 1.1rem;
-		font-size: 0.9rem;
-		line-height: 1.45;
-		color: var(--text-secondary);
-		background: rgba(255, 255, 255, 0.04);
-		border: 1px solid var(--border-color);
-		border-radius: var(--radius-sm, 8px);
-		text-align: center;
 	}
 
 	.page-header p {
@@ -330,6 +311,7 @@
 		display: -webkit-box;
 		-webkit-box-orient: vertical;
 		-webkit-line-clamp: 2;
+		line-clamp: 2;
 		overflow: hidden;
 		word-break: break-word;
 	}

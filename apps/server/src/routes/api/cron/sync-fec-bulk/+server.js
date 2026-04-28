@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { runSyncStocksCron } from '$lib/server/cron-jobs.js';
+import { runSyncFecBulkCron } from '$lib/server/cron-jobs.js';
 
 export async function GET({ request, url }) {
 	const authHeader = request.headers.get('authorization');
@@ -11,9 +11,9 @@ export async function GET({ request, url }) {
 	}
 
 	try {
-		return json(await runSyncStocksCron());
+		return json(await runSyncFecBulkCron());
 	} catch (err) {
-		console.error('[sync-stocks]', err);
-		return json({ error: err.message || 'Stock sync failed' }, { status: 500 });
+		console.error('[Cron] FEC bulk sync failure:', err);
+		return json({ error: 'Internal server error during FEC bulk sync' }, { status: 500 });
 	}
 }

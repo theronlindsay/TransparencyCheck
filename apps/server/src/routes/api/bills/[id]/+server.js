@@ -1,13 +1,6 @@
 import { json } from '@sveltejs/kit';
-import {
-	getBillById,
-	getBillTextVersions,
-	getBillActions,
-	fetchAndStoreTextVersions
-} from '$lib/db/bills.js';
+import { getBillById, getBillTextVersions, getBillActions } from '$lib/db/bills.js';
 import { importBillBySlugIfMissing } from '$lib/bill-fetcher.js';
-
-const CONGRESS_API_KEY = process.env.CONGRESS_API_KEY;
 
 export async function GET({ params }) {
 	try {
@@ -17,10 +10,11 @@ export async function GET({ params }) {
 		}
 
 		let billData = await getBillById(rawId);
+
 		if (!billData) {
-			const canonicalId = await importBillBySlugIfMissing(rawId);
-			if (canonicalId) {
-				billData = await getBillById(canonicalId);
+			const importedId = await importBillBySlugIfMissing(rawId);
+			if (importedId) {
+				billData = await getBillById(importedId);
 			}
 		}
 
@@ -30,22 +24,7 @@ export async function GET({ params }) {
 
 		const billKey = billData._id;
 
-		let textVersions = await getBillTextVersions(billKey);
-
-		if (textVersions.length === 0 && billData.textVersionsUrl && CONGRESS_API_KEY) {
-			console.log(`📥 Fetching text versions for ${billKey}…`);
-			try {
-				textVersions = await fetchAndStoreTextVersions(
-					billKey,
-					billData.textVersionsUrl,
-					CONGRESS_API_KEY
-				);
-				console.log(`✅ Fetched and stored ${textVersions.length} text versions for ${billKey}`);
-			} catch (err) {
-				console.error(`Failed to fetch text versions for ${billKey}:`, err);
-			}
-		}
-
+		const textVersions = await getBillTextVersions(billKey);
 		const actions = await getBillActions(billKey);
 
 		// Format the bill data
@@ -73,10 +52,7 @@ export async function GET({ params }) {
 		console.error(`Error fetching bill ${params.id}:`, error);
 		// Log the full stack trace
 		if (error.stack) console.error(error.stack);
-		return json(
-			{ error: error.message, stack: error.stack },
-			{ status: 500}
-		);
+		return json({ error: error.message, stack: error.stack }, { status: 500 });
 	}
 }
 

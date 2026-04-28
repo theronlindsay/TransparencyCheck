@@ -31,7 +31,7 @@ COPY --from=build /app/apps/server/build ./apps/server/build
 COPY docker/server/start.sh ./start.sh
 RUN chmod +x ./start.sh
 
-RUN mkdir -p /app/db /app/.cache
+RUN mkdir -p /app/db /app/.cache /app/logs
 
 EXPOSE 3000
 
