@@ -5,6 +5,8 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import BottomTabBar from '$lib/Components/BottomTabBar.svelte';
 	import AIAssistant from '$lib/Components/AIAssistant.svelte';
+	import BugReportLauncher from '$lib/Components/BugReportLauncher.svelte';
+	import BugReportModal from '$lib/Components/BugReportModal.svelte';
 	import CookieConsent from '$lib/Components/CookieConsent.svelte';
 	import { refreshSession } from '$lib/stores/auth.js';
 	import { pwaInfo } from 'virtual:pwa-info';
@@ -12,7 +14,9 @@
 
 	let { children } = $props();
 	let isScrolled = $state(false);
+	let showBugReportModal = $state(false);
 	let isCompactHeader = $derived($page.url.pathname !== '/' || isScrolled);
+	let bugReportPagePath = $derived($page.url.pathname + ($page.url.search ? $page.url.search : ''));
 
 	onMount(async () => {
 		refreshSession();
@@ -80,6 +84,10 @@
 			<a href={resolve('/')} class="logo-link">
 				<img src="/Logo.png" alt="Transparency Check" />
 			</a>
+
+			<div class="header-actions">
+				<BugReportLauncher onClick={() => (showBugReportModal = true)} />
+			</div>
 		</div>
 
 		<!-- <Navbar /> -->
@@ -90,6 +98,7 @@
 	</div>
 
 	<AIAssistant />
+	<BugReportModal bind:show={showBugReportModal} pagePath={bugReportPagePath} />
 	<BottomTabBar />
 	<CookieConsent />
 </div>
@@ -124,6 +133,12 @@
 		transition:
 			width 0.3s ease,
 			margin 0.3s ease;
+	}
+
+	.header-actions {
+		margin-left: auto;
+		display: flex;
+		align-items: center;
 	}
 
 	.navbar-container {
@@ -167,7 +182,7 @@
 
 		.app-header {
 			flex-direction: row;
-			justify-content: flex-start;
+			justify-content: space-between;
 			align-items: center;
 			gap: 1rem;
 			padding: 1rem;

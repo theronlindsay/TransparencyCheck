@@ -20,6 +20,7 @@
 	let textVersions = $state([]);
 	let actions = $state([]);
 	let isLoading = $state(true);
+	let isLoadingTextVersions = $state(false);
 	let loadError = $state(null);
 	let isSaved = $state(false);
 	let isSaving = $state(false);
@@ -82,6 +83,7 @@
 	async function fetchBillFromAPI(billId) {
 		const gen = ++billFetchGeneration;
 		isLoading = true;
+		isLoadingTextVersions = false;
 		loadError = null;
 		bill = null;
 		textVersions = [];
@@ -110,6 +112,9 @@
 			bill = result.bill;
 			textVersions = result.textVersions || [];
 			actions = result.actions || [];
+			if ((result.bill?.textVersionsCount || 0) > 0) {
+				void fetchTextVersionsFromAPI(billId, gen);
+			}
 
 			const saveBillKey = result.bill?.number ?? result.bill?.id ?? billId;
 			const saveRes = await fetch(
@@ -127,6 +132,29 @@
 		} finally {
 			if (gen === billFetchGeneration) {
 				isLoading = false;
+			}
+		}
+	}
+
+	async function fetchTextVersionsFromAPI(billId, gen = billFetchGeneration) {
+		isLoadingTextVersions = true;
+		try {
+			const response = await fetch(
+				apiUrl(`/api/bills/${encodeURIComponent(billId)}/text-versions`)
+			);
+			if (gen !== billFetchGeneration) return;
+			if (!response.ok) {
+				throw new Error(`Failed to load bill text versions (${response.status})`);
+			}
+			const result = await response.json();
+			if (gen !== billFetchGeneration) return;
+			textVersions = result.textVersions || [];
+		} catch (err) {
+			if (gen !== billFetchGeneration) return;
+			console.error('Error fetching bill text versions:', err);
+		} finally {
+			if (gen === billFetchGeneration) {
+				isLoadingTextVersions = false;
 			}
 		}
 	}
@@ -686,113 +714,145 @@
 				{/if}
 
 				<!-- Bill Text Versions Section -->
-				{#if textVersions && textVersions.length > 0}
+				{#if isLoadingTextVersions || (textVersions && textVersions.length > 0)}
 					<section class="section text-versions elevated-surface bill-section-panel">
 						<h2>Bill Text Versions</h2>
 						<p class="section-description">View different versions of this bill text</p>
 
-						<!-- Version Tabs -->
-						<div class="version-tabs">
-							{#each Object.entries(versionsByType) as [type, versionData] (type)}
-								<div class="version-tab-group">
-									<div class="version-type-header">
-										<h3>{formatVersionType(type)}</h3>
-										{#if versionData.date}
-											<span class="version-date">{formatDate(versionData.date)}</span>
-										{/if}
-									</div>
+						{#if isLoadingTextVersions}
+							<div class="loading-preview">
+								<div class="spinner"></div>
+								<p>Fetching bill text from Congress.gov…</p>
+							</div>
+						{:else}
+							<!-- Version Tabs -->
+							<div class="version-tabs">
+								{#each Object.entries(versionsByType) as [type, versionData] (type)}
+									<div class="version-tab-group">
+										<div class="version-type-header">
+											<h3>{formatVersionType(type)}</h3>
+											{#if versionData.date}
+												<span class="version-date">{formatDate(versionData.date)}</span>
+											{/if}
+										</div>
 
-									<div class="format-tabs">
-										{#each versionData.formats as format (format.url)}
-											<button
-												class="format-tab"
-												class:active={activeVersionType === type &&
-													activeFormat?.url === format.url}
-												onclick={() => selectVersion(type, format)}
-											>
-												<span class="format-icon">{getFormatIcon(format.formatType)}</span>
-												<span class="format-label">{format.formatType}</span>
-											</button>
-										{/each}
+										<div class="format-tabs">
+											{#each versionData.formats as format (format.url)}
+												<button
+													class="format-tab"
+													class:active={activeVersionType === type &&
+														activeFormat?.url === format.url}
+													onclick={() => selectVersion(type, format)}
+												>
+													<span class="format-icon">{getFormatIcon(format.formatType)}</span>
+													<span class="format-label">{format.formatType}</span>
+												</button>
+											{/each}
+										</div>
 									</div>
-								</div>
-							{/each}
-						</div>
+								{/each}
+							</div>
 
-						<!-- Preview Area -->
-						{#if activeFormat}
-							<div class="preview-area">
-								<div class="preview-header">
-									<h3>
-										Preview: {formatVersionType(activeVersionType)} - {activeFormat.formatType}
-									</h3>
-									<button
-										type="button"
-										class="download-link"
-										onclick={() => openExternal(activeFormat.url)}
-									>
-										<svg
-											width="16"
-											height="16"
-											viewBox="0 0 16 16"
-											fill="none"
-											xmlns="http://www.w3.org/2000/svg"
+							<!-- Preview Area -->
+							{#if activeFormat}
+								<div class="preview-area">
+									<div class="preview-header">
+										<h3>
+											Preview: {formatVersionType(activeVersionType)} - {activeFormat.formatType}
+										</h3>
+										<button
+											type="button"
+											class="download-link"
+											onclick={() => openExternal(activeFormat.url)}
 										>
-											<path
-												d="M14 9V14H2V9H0V14C0 15.1 0.9 16 2 16H14C15.1 16 16 15.1 16 14V9H14Z"
-												fill="currentColor"
-											/>
-											<path
-												d="M7 3V9.17L4.41 6.58L3 8L8 13L13 8L11.59 6.58L9 9.17V3H7Z"
-												fill="currentColor"
-											/>
-										</svg>
-										Download from Congress.gov
-									</button>
-								</div>
-
-								{#if isLoadingHtml}
-									<div class="loading-preview">
-										<div class="spinner"></div>
-										<p>Loading bill text...</p>
-									</div>
-								{:else if htmlContent}
-									<!-- Render proxied markup in iframe srcdoc to avoid direct HTML injection in component -->
-									<div class="html-content">
-										<iframe class="html-frame" title="Bill text preview" srcdoc={htmlContent}
-										></iframe>
-									</div>
-								{:else if activeFormat.formatType?.toUpperCase() === 'PDF'}
-									<!-- Desktop View -->
-									<div class="desktop-pdf-view">
-										<PdfViewer
-											url={apiUrl(`/api/pdf?url=${encodeURIComponent(activeFormat.url)}`)}
-										/>
-									</div>
-
-									<!-- Mobile View Trigger -->
-									<div class="mobile-pdf-view">
-										<button class="view-pdf-btn" onclick={openMobilePdf}>
-											<span class="icon">📄</span>
-											View PDF Document
+											<svg
+												width="16"
+												height="16"
+												viewBox="0 0 16 16"
+												fill="none"
+												xmlns="http://www.w3.org/2000/svg"
+											>
+												<path
+													d="M14 9V14H2V9H0V14C0 15.1 0.9 16 2 16H14C15.1 16 16 15.1 16 14V9H14Z"
+													fill="currentColor"
+												/>
+												<path
+													d="M7 3V9.17L4.41 6.58L3 8L8 13L13 8L11.59 6.58L9 9.17V3H7Z"
+													fill="currentColor"
+												/>
+											</svg>
+											Download from Congress.gov
 										</button>
 									</div>
-								{:else if activeFormat.formatType?.toUpperCase().includes('XML')}
-									<!-- Display XML with syntax highlighting -->
+
 									{#if isLoadingHtml}
 										<div class="loading-preview">
 											<div class="spinner"></div>
-											<p>Loading XML content...</p>
+											<p>Loading bill text...</p>
 										</div>
 									{:else if htmlContent}
-										<div class="xml-content">
-											<pre><code>{htmlContent}</code></pre>
+										<div class="html-content">
+											<iframe class="html-frame" title="Bill text preview" srcdoc={htmlContent}
+											></iframe>
 										</div>
+									{:else if activeFormat.formatType?.toUpperCase() === 'PDF'}
+										<div class="desktop-pdf-view">
+											<PdfViewer
+												url={apiUrl(`/api/pdf?url=${encodeURIComponent(activeFormat.url)}`)}
+											/>
+										</div>
+
+										<div class="mobile-pdf-view">
+											<button class="view-pdf-btn" onclick={openMobilePdf}>
+												<span class="icon">📄</span>
+												View PDF Document
+											</button>
+										</div>
+									{:else if activeFormat.formatType?.toUpperCase().includes('XML')}
+										{#if isLoadingHtml}
+											<div class="loading-preview">
+												<div class="spinner"></div>
+												<p>Loading XML content...</p>
+											</div>
+										{:else if htmlContent}
+											<div class="xml-content">
+												<pre><code>{htmlContent}</code></pre>
+											</div>
+										{:else}
+											<div class="download-message">
+												<div class="format-icon-large">📋</div>
+												<h4>XML Format</h4>
+												<p>Unable to load XML content.</p>
+												<button
+													type="button"
+													class="download-button"
+													onclick={() => openExternal(activeFormat.url)}
+												>
+													<svg
+														width="20"
+														height="20"
+														viewBox="0 0 16 16"
+														fill="none"
+														xmlns="http://www.w3.org/2000/svg"
+													>
+														<path
+															d="M14 9V14H2V9H0V14C0 15.1 0.9 16 2 16H14C15.1 16 16 15.1 16 14V9H14Z"
+															fill="currentColor"
+														/>
+														<path
+															d="M7 3V9.17L4.41 6.58L3 8L8 13L13 8L11.59 6.58L9 9.17V3H7Z"
+															fill="currentColor"
+														/>
+													</svg>
+													Download XML
+												</button>
+											</div>
+										{/if}
 									{:else}
 										<div class="download-message">
-											<div class="format-icon-large">📋</div>
-											<h4>XML Format</h4>
-											<p>Unable to load XML content.</p>
+											<div class="format-icon-large">{getFormatIcon(activeFormat.formatType)}</div>
+											<h4>{activeFormat.formatType} Format</h4>
+											<p>This format cannot be previewed in the browser.</p>
 											<button
 												type="button"
 												class="download-button"
@@ -814,42 +874,12 @@
 														fill="currentColor"
 													/>
 												</svg>
-												Download XML
+												Download and View
 											</button>
 										</div>
 									{/if}
-								{:else}
-									<!-- For other formats, show download message -->
-									<div class="download-message">
-										<div class="format-icon-large">{getFormatIcon(activeFormat.formatType)}</div>
-										<h4>{activeFormat.formatType} Format</h4>
-										<p>This format cannot be previewed in the browser.</p>
-										<button
-											type="button"
-											class="download-button"
-											onclick={() => openExternal(activeFormat.url)}
-										>
-											<svg
-												width="20"
-												height="20"
-												viewBox="0 0 16 16"
-												fill="none"
-												xmlns="http://www.w3.org/2000/svg"
-											>
-												<path
-													d="M14 9V14H2V9H0V14C0 15.1 0.9 16 2 16H14C15.1 16 16 15.1 16 14V9H14Z"
-													fill="currentColor"
-												/>
-												<path
-													d="M7 3V9.17L4.41 6.58L3 8L8 13L13 8L11.59 6.58L9 9.17V3H7Z"
-													fill="currentColor"
-												/>
-											</svg>
-											Download and View
-										</button>
-									</div>
-								{/if}
-							</div>
+								</div>
+							{/if}
 						{/if}
 					</section>
 				{:else}
