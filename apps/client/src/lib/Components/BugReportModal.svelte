@@ -161,7 +161,18 @@
 			aria-label="Bug report form"
 			tabindex="-1"
 		>
-			<button class="close-button" onclick={closeModal} aria-label="Close">&times;</button>
+			<button
+				type="button"
+				class="close-button"
+				onpointerdown={(event) => event.stopPropagation()}
+				onclick={(event) => {
+					event.stopPropagation();
+					closeModal();
+				}}
+				aria-label="Close"
+			>
+				&times;
+			</button>
 
 			<div class="modal-header">
 				<p class="eyebrow">Feedback</p>
@@ -264,6 +275,7 @@
 	}
 
 	.modal-content {
+		position: relative;
 		width: min(680px, 100%);
 		max-height: min(88vh, 760px);
 		overflow: auto;
@@ -282,6 +294,19 @@
 		color: var(--text-secondary);
 		font-size: 1.6rem;
 		cursor: pointer;
+		z-index: 2;
+		width: 2.5rem;
+		height: 2.5rem;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 999px;
+		line-height: 1;
+	}
+
+	.close-button:hover {
+		background: rgba(255, 255, 255, 0.08);
+		color: var(--text-primary);
 	}
 
 	.modal-header,

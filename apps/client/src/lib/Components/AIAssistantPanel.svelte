@@ -189,7 +189,18 @@
 				<p class="eyebrow">{context.pageLabel}</p>
 				<h3>AI Assistant</h3>
 			</div>
-			<button class="close-button" type="button" onclick={onClose}>✖</button>
+			<button
+				class="close-button"
+				type="button"
+				onpointerdown={(event) => event.stopPropagation()}
+				onclick={(event) => {
+					event.stopPropagation();
+					onClose();
+				}}
+				aria-label="Close AI assistant"
+			>
+				✖
+			</button>
 		</header>
 
 		<div class="messages">
@@ -294,8 +305,16 @@
 		border: 1px solid rgba(255, 255, 255, 0.12);
 		border-radius: 10px;
 		color: var(--text-primary);
-		padding: 0.4rem 0.55rem;
+		width: 2.35rem;
+		height: 2.35rem;
+		padding: 0;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
 		cursor: pointer;
+		flex: 0 0 auto;
+		position: relative;
+		z-index: 2;
 	}
 
 	.messages {

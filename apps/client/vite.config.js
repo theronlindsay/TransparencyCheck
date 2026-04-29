@@ -11,6 +11,9 @@ export default defineConfig({
 			scope: '/',
 			base: '/',
 			workbox: {
+				globPatterns: ['**/*.{js,css,html,png,svg,webmanifest}'],
+				navigateFallback: '/index.html',
+				additionalManifestEntries: [{ url: '/index.html', revision: null }],
 				runtimeCaching: [
 					{
 						urlPattern: /\/__data\.json/,
