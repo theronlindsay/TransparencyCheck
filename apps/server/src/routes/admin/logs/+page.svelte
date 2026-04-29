@@ -4,7 +4,7 @@
 	export let data;
 	export let form;
 
-	const active = form?.lines ? form : data;
+	let active = data;
 	let logViewer;
 
 	async function scrollLogsToBottom() {
@@ -14,7 +14,10 @@
 		}
 	}
 
-	$: active.lines, scrollLogsToBottom();
+	$: active = form?.lines ? form : data;
+	$: if (active.lines) {
+		scrollLogsToBottom();
+	}
 </script>
 
 <svelte:head>

@@ -7,8 +7,17 @@ export async function init() {
 		defaults: '2026-01-30',
 		capture_exceptions: true,
 		disable_session_recording: false,
+		session_recording: {
+			maskAllInputs: true
+		},
 		// GDPR Compliance: Wait for active consent
-		opt_out_capturing_by_default: true
+		opt_out_capturing_by_default: true,
+		loaded: (posthog) => {
+			if (localStorage.getItem('cookie_consent') === 'true') {
+				posthog.opt_in_capturing();
+				posthog.startSessionRecording();
+			}
+		}
 	});
 	console.log('PostHog initialized');
 }

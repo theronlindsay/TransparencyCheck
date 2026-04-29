@@ -13,6 +13,7 @@
 				showBanner = true;
 			} else if (hasConsented === 'true') {
 				posthog.opt_in_capturing();
+				posthog.startSessionRecording();
 			}
 		}, 500);
 	});
@@ -20,11 +21,13 @@
 	function acceptCookies() {
 		localStorage.setItem('cookie_consent', 'true');
 		posthog.opt_in_capturing();
+		posthog.startSessionRecording();
 		showBanner = false;
 	}
 
 	function declineCookies() {
 		localStorage.setItem('cookie_consent', 'false');
+		posthog.stopSessionRecording();
 		posthog.opt_out_capturing();
 		showBanner = false;
 	}
