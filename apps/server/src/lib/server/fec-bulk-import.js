@@ -426,7 +426,11 @@ function renderProgressBar(progress) {
 async function downloadToTempFile(url, filename) {
 	const tmpDir = await mkdtemp(path.join(os.tmpdir(), 'tc-fec-'));
 	const filePath = path.join(tmpDir, filename);
-	const timeoutMs = Number.parseInt(process.env.FEC_BULK_DOWNLOAD_TIMEOUT_MS ?? '120000', 10);
+	// `??` does not catch an env var that is set but empty, which is what happens
+	// when the key is present in .env with no value — parseInt('') is NaN and
+	// setTimeout(fn, NaN) aborts the download immediately.
+	const timeoutMs =
+		Number.parseInt(process.env.FEC_BULK_DOWNLOAD_TIMEOUT_MS ?? '120000', 10) || 120000;
 	const controller = new AbortController();
 	let timeout = setTimeout(() => controller.abort(), timeoutMs);
 	const response = await fetch(url, {

@@ -17,6 +17,12 @@ build
 .github
 
 # Environment & secrets
+# .env must never enter the build context: `COPY . .` in the server dockerfile
+# would otherwise bake production credentials into an image layer.
+.env
+.env.*
+!.env.example
+instructions.txt
 *.pem
 ssl
 
@@ -51,5 +57,7 @@ ios
 
 # Misc
 README.md
-sslSetup
+docs
+scripts
+init.sh
 coverage

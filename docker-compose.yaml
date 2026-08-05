@@ -1,22 +1,33 @@
+name: transparencycheck
+
+# Keep container logs from filling a small VPS disk.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   mongodb:
     image: mongo:8.2
     restart: unless-stopped
+    logging: *default-logging
     environment:
       - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER:-admin}
-      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD:-password123}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD:?MONGO_ROOT_PASSWORD is required - run ./init.sh to generate one}
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "mongosh --quiet --username ${MONGO_ROOT_USER:-admin} --password ${MONGO_ROOT_PASSWORD:-password123} --authenticationDatabase admin --eval 'db.runCommand({ ping: 1 })'"
+          "mongosh --quiet --username ${MONGO_ROOT_USER:-admin} --password ${MONGO_ROOT_PASSWORD} --authenticationDatabase admin --eval 'db.runCommand({ ping: 1 })'"
         ]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 20s
     ports:
-      - "127.0.0.1:27017:27017" # Bound strictly to localhost to prevent external access
+      # Localhost only: lets you run `mongosh` from the host, never reachable externally.
+      - "127.0.0.1:27017:27017"
     volumes:
       - mongodb_data:/data/db # Persists your database so data isn't lost on restart
 
@@ -25,6 +36,7 @@ services:
       context: .
       dockerfile: docker/server/dockerfile
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       mongodb:
         condition: service_healthy # Wait for MongoDB to be ready before server starts
@@ -33,26 +45,106 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - DATABASE_URL=mongodb://${MONGO_ROOT_USER:-admin}:${MONGO_ROOT_PASSWORD:-password123}@mongodb:27017/transparency_check?authSource=admin
+      # .env wins if it sets DATABASE_URL (e.g. an external/managed MongoDB).
+      - DATABASE_URL=${DATABASE_URL:-mongodb://${MONGO_ROOT_USER:-admin}:${MONGO_ROOT_PASSWORD}@mongodb:27017/transparency_check?authSource=admin}
+      # adapter-node runs behind the proxy: without these it treats every request
+      # as plain http on an internal hostname, which breaks redirect URLs,
+      # form-action origin checks, Secure cookies and client IP logging.
+      - PROTOCOL_HEADER=x-forwarded-proto
+      - HOST_HEADER=x-forwarded-host
+      - ADDRESS_HEADER=x-forwarded-for
+      - XFF_DEPTH=1
+      - BODY_SIZE_LIMIT=26214400
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "bun -e \"const r = await fetch('http://127.0.0.1:3000/'); process.exit(r.status < 500 ? 0 : 1)\""
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     volumes:
       - pdf-cache:/app/.cache
       - server_logs:/app/logs
-    ports:
-      - "3000:3000"
+    # Deliberately not published: the API is reached through the proxy. Exposing
+    # 3000 on the host would put the API and admin panel on the public internet
+    # with no TLS.
+    expose:
+      - "3000"
 
   client:
     build:
       context: .
       dockerfile: docker/client/dockerfile
       args:
-        VITE_API_BASE_URL: "" # Empty string for nginx proxy - nginx will route /api/ to server:3000
+        # Empty means the PWA uses same-origin relative /api paths through the
+        # proxy. Only set this for Capacitor/native builds.
+        VITE_API_BASE_URL: "${VITE_API_BASE_URL:-}"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    expose:
+      - "80"
+
+  # Edge proxy: terminates TLS, redirects HTTP to HTTPS, serves the ACME
+  # challenge, routes /api/ to the server and everything else to the client.
+  # Starts HTTP-only and switches itself to HTTPS once a certificate exists, so
+  # a first deploy never deadlocks waiting for one.
+  proxy:
+    build:
+      context: docker/proxy
+      dockerfile: dockerfile # lowercase, matching the other images
+    restart: unless-stopped
+    logging: *default-logging
     depends_on:
+      - client
       - server
+    environment:
+      - DOMAIN=${DOMAIN:-}
+      - ADMIN_DOMAIN=${ADMIN_DOMAIN:-}
     ports:
-      - "8080:80"  # Change to 8080:80 for production server
-      # - "8443:443"
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - letsencrypt:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Renewal loop. First issuance is done by ./init.sh (which knows which domains
+  # actually resolve here); this service only keeps certificates fresh. The proxy
+  # reloads on its own schedule, so the two need no signalling between them.
+  certbot:
+    image: docker.io/certbot/certbot:latest
+    restart: unless-stopped
+    logging: *default-logging
+    volumes:
+      - letsencrypt:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        trap exit TERM
+        while :; do
+          certbot renew --webroot --webroot-path /var/www/certbot --quiet || true
+          sleep 12h & wait $${!}
+        done
 
 volumes:
   pdf-cache:
   mongodb_data:
   server_logs:
+  letsencrypt:
+  certbot_www:

@@ -1,0 +1,16 @@
+# HTTP-only mode: used until a Let's Encrypt certificate exists for $DOMAIN.
+# The site is fully usable here — this is also the config you stay on if you
+# deploy without a domain (plain IP access).
+server {
+	listen 80 default_server;
+	server_name ${SERVER_NAMES};
+
+	# ACME HTTP-01 challenge, shared with the certbot container by volume.
+	location ^~ /.well-known/acme-challenge/ {
+		root /var/www/certbot;
+		default_type text/plain;
+		access_log off;
+	}
+
+	include /etc/nginx/conf.d/app-proxy.inc;
+}

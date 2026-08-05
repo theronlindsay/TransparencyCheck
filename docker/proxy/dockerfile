@@ -1,0 +1,15 @@
+FROM docker.io/library/nginx:1.27-alpine
+
+# Templates are rendered at container start rather than build time, so one image
+# works for any domain and the config can flip from HTTP-only to HTTPS as soon
+# as a Let's Encrypt certificate lands in the shared volume.
+COPY templates/ /etc/nginx/tc-templates/
+COPY tls-params.conf /etc/nginx/tls-params.conf
+COPY upgrade-map.conf /etc/nginx/conf.d/00-upgrade-map.conf
+COPY render-config.sh /usr/local/bin/render-tc-config
+COPY docker-entrypoint.d/ /docker-entrypoint.d/
+
+RUN chmod +x /usr/local/bin/render-tc-config /docker-entrypoint.d/*.sh \
+	&& mkdir -p /var/www/certbot
+
+EXPOSE 80 443

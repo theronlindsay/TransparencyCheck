@@ -1,0 +1,18 @@
+# Admin panel (server-rendered by the API container, host-gated by
+# ADMIN_PANEL_HOSTS). HTTP-only variant, used until a certificate exists.
+#
+# Note: the admin session cookie is Secure in production, so admin login only
+# actually works over HTTPS — point ADMIN_DOMAIN's DNS at this host before
+# issuing the certificate so it gets covered.
+server {
+	listen 80;
+	server_name ${ADMIN_DOMAIN};
+
+	location ^~ /.well-known/acme-challenge/ {
+		root /var/www/certbot;
+		default_type text/plain;
+		access_log off;
+	}
+
+	include /etc/nginx/conf.d/admin-proxy.inc;
+}

@@ -23,4 +23,5 @@ FROM docker.io/library/nginx:alpine
 COPY docker/client/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/apps/client/build /usr/share/nginx/html
 
-EXPOSE 80 443
+# Static files only; TLS is terminated by the `proxy` service.
+EXPOSE 80

@@ -71,3 +71,6 @@ apps/server/prisma/apps/server/db
 instructions.txt
 .env
 .claude
+
+# ...but the template that init.sh copies to .env must be committed.
+!.env.example

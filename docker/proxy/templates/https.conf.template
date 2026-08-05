@@ -1,0 +1,40 @@
+# HTTPS mode: rendered automatically once
+# /etc/letsencrypt/live/${DOMAIN}/fullchain.pem exists.
+server {
+	listen 80 default_server;
+	server_name ${SERVER_NAMES};
+
+	# Renewals must keep working over plain HTTP, so the challenge path is
+	# served before the redirect.
+	location ^~ /.well-known/acme-challenge/ {
+		root /var/www/certbot;
+		default_type text/plain;
+		access_log off;
+	}
+
+	location = /healthz {
+		access_log off;
+		default_type text/plain;
+		return 200 "ok\n";
+	}
+
+	location / {
+		return 301 https://$host$request_uri;
+	}
+}
+
+server {
+	listen 443 ssl;
+	http2 on;
+	server_name ${SERVER_NAMES};
+
+	ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
+	ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+	include /etc/nginx/tls-params.conf;
+
+	add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+	add_header X-Content-Type-Options "nosniff" always;
+	add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+	include /etc/nginx/conf.d/app-proxy.inc;
+}

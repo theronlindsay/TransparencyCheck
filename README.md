@@ -1,13 +1,13 @@
 # TransparencyCheck
 
-Dashboard for tracking U.S. congressional legislation with AI-powered bill summarization. Built with **SvelteKit 2 + Svelte 5** and **SQLite** (via native `sqlite3`). Syncs data from Congress.gov API and provides OpenAI-powered summaries.
+Dashboard for tracking U.S. congressional legislation with AI-powered bill summarization. Built with **SvelteKit 2 + Svelte 5** and **MongoDB**. Syncs data from the Congress.gov API and provides AI-generated summaries.
 
 ## Architecture
 
 This is a **bun workspaces monorepo** with two applications:
 
 - **Client** (`apps/client/`) — Static PWA with offline support (SvelteKit + adapter-static)
-- **Server** (`apps/server/`) — Node.js API server with SQLite database (SvelteKit + adapter-node)
+- **Server** (`apps/server/`) — Node.js API server backed by MongoDB (SvelteKit + adapter-node)
 
 The client app can be deployed as:
 
@@ -16,27 +16,49 @@ The client app can be deployed as:
 
 ## Prerequisites
 
-- Bun (includes a Node.js-compatible runtime)
-- Docker & Docker Compose (for containerized deployment)
+- Bun (includes a Node.js-compatible runtime) — for local development
+- Docker Engine + Compose plugin, or Podman + `podman-compose` — for deployment
 
-## Installation
+## Deploy it
+
+```bash
+git clone https://github.com/theronlindsay/TransparencyCheck.git
+cd TransparencyCheck
+./init.sh --domain example.com --email you@example.com
+```
+
+That's the whole deployment: MongoDB, the API, the PWA and an nginx edge proxy
+with an auto-renewing Let's Encrypt certificate. Run `./init.sh` with no
+arguments to serve plain HTTP on the machine's IP instead, and re-run it with a
+domain whenever you're ready for HTTPS.
+
+Full walkthrough, including DNS, firewall, the admin subdomain, backups and
+troubleshooting: **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
+
+## Installation (local development)
 
 ```bash
 bun install
+cp .env.example .env
 ```
 
-The SQLite database (`apps/server/src/lib/db/transparency.sqlite`) is created automatically on first run. Bills are synced from Congress.gov when you visit the homepage.
+Fill in at least `CONGRESS_API_KEY`, `OPENAI_API_KEY` and `DATABASE_URL`
+(a local `mongodb://…` URI). Bills sync from Congress.gov when you visit the
+homepage.
 
 ## Environment Variables
 
-Create a `.env` file in the project root:
+Every supported variable is documented in [`.env.example`](.env.example);
+`./init.sh` copies it to `.env` and generates the secrets. The ones you have to
+supply yourself:
 
 ```bash
-CONGRESS_API_KEY=your-key     # Required - Congress.gov API key
-OPENAI_API_KEY=your-key       # Required - OpenAI for bill summarization
+CONGRESS_API_KEY=your-key   # Required — https://api.congress.gov/sign-up/
+OPENAI_API_KEY=your-key     # Required for AI summaries (or OPENROUTER_API_KEY)
 ```
 
-[Request a Congress.gov API key](https://api.congress.gov/) if you don't have one.
+Secrets generated for you on first run: `MONGO_ROOT_PASSWORD`,
+`BETTER_AUTH_SECRET`, `CRON_SECRET`, `ADMIN_PANEL_PASSWORD`.
 
 ## Development
 
@@ -50,27 +72,38 @@ bun run dev:server
 
 ## Production Build & Deployment
 
-### Option 1: Docker Deployment (Recommended)
-
-The easiest way to deploy is using Docker Compose, which runs both client and server:
+### Option 1: Containers (Recommended)
 
 ```bash
-# Generate SSL certificates (see README-SSL.md for production certs)
-.\generate-ssl-certs.ps1  # Windows
-./generate-ssl-certs.sh   # Linux/Mac
-
-# Build and start containers
-docker compose up -d
+./init.sh --domain example.com --email you@example.com
 ```
 
-Access the app at:
+This builds and starts five services and handles TLS end to end:
 
-- **HTTPS**: https://localhost:8443
-- **HTTP**: http://localhost:8080 (redirects to HTTPS)
+| Service   | Role                                                       | Host ports        |
+| --------- | ---------------------------------------------------------- | ----------------- |
+| `proxy`   | nginx: HTTPS termination, HTTP→HTTPS redirect, routing      | `80`, `443`       |
+| `client`  | nginx serving the built PWA                                 | internal only     |
+| `server`  | SvelteKit API (`/api/*`) and admin panel                    | internal only     |
+| `mongodb` | Database                                                    | `127.0.0.1:27017` |
+| `certbot` | Certificate renewal loop                                    | none              |
 
-The server runs on port 3000 (internal to Docker network).
+The proxy starts in HTTP-only mode, gets a certificate over HTTP-01, then
+switches itself to HTTPS — no manual certificate juggling and no editing nginx
+configs. Renewals happen automatically.
 
-See [README-SSL.md](README-SSL.md) for Let's Encrypt setup and production HTTPS configuration.
+Day-to-day operations go through the engine-agnostic compose wrapper (it picks
+Docker or Podman for you):
+
+```bash
+./scripts/compose.sh ps
+./scripts/compose.sh logs -f server
+./scripts/compose.sh up -d --build     # after a git pull
+./scripts/compose.sh down
+```
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for DNS, firewall, the admin
+subdomain, backups and troubleshooting.
 
 ### Option 2: Manual Build
 
@@ -141,22 +174,29 @@ TransparencyCheck/
 │       │   ├── routes/api/  # API endpoints
 │       │   ├── lib/
 │       │   │   ├── db/      # Database layer
-│       │   │   │   ├── schema.js      # Table definitions
-│       │   │   │   ├── queries.js     # Query helpers
-│       │   │   │   ├── bills.js       # Bill operations
-│       │   │   │   └── connection.js  # SQLite connection
+│       │   │   │   ├── mongo.js       # MongoDB driver connection
+│       │   │   │   ├── mongoose.js    # Mongoose connection
+│       │   │   │   └── adapters/      # Collection helpers
 │       │   │   └── bill-fetcher.js    # Congress.gov sync
 │       ├── package.json
 │       ├── svelte.config.js     # Uses adapter-node
 │       └── vite.config.js
 ├── docker/
-│   ├── client/
+│   ├── client/              # nginx image serving the built PWA
 │   │   ├── dockerfile
-│   │   └── nginx.conf       # HTTPS + redirect config
-│   ├── server/
-│   │   └── dockerfile
-├── docker-compose           # Orchestrates client + server
-└── package.json             # Workspace root
+│   │   └── nginx.conf
+│   ├── proxy/              # nginx edge proxy: TLS, redirect, routing
+│   │   ├── dockerfile
+│   │   ├── templates/       # HTTP-only and HTTPS configs, rendered at start
+│   │   └── render-config.sh
+│   └── server/
+│       └── dockerfile
+├── docs/DEPLOYMENT.md      # VPS deployment guide
+├── scripts/compose.sh      # Docker/Podman-agnostic compose wrapper
+├── init.sh                 # One-command setup (env, secrets, HTTPS)
+├── .env.example            # Every supported environment variable
+├── docker-compose.yaml     # Orchestrates the five services
+└── package.json            # Workspace root
 
 ```
 
@@ -165,7 +205,7 @@ TransparencyCheck/
 - `/api/openAI` — OpenAI chat completions for bill summarization
 - `/api/fetch-bill-text` — Proxies Congress.gov bill text (avoids CORS)
 - `/api/pdf` — Proxies PDF documents for iframe display
-- `/api/bills` — Returns bill data from SQLite
+- `/api/bills` — Returns bill data from MongoDB
 - `/api/search-bills` — Full-text search across bills
 
 ## Floating AI Assistant
@@ -204,15 +244,26 @@ Additional implementation details are tracked in:
 
 ## Database
 
-Bills sync automatically via background process on homepage load (fetches 20 most recent bills). Schema includes:
+MongoDB, configured through `DATABASE_URL`. Bills sync automatically via a
+background process on homepage load (fetches the 20 most recent bills).
+Collections include:
 
-- `bills` — Core bill data with JSON fields for complex structures
+- `bills` — Core bill data
 - `people` — Sponsors and legislators
 - `committees` — Congressional committees
 - `bill_actions` — Legislative action timeline
 - `bill_text_versions` — Cached bill text content
 
-Database location: `apps/server/src/lib/db/transparency.sqlite` (or `/app/db/transparency.sqlite` in Docker)
+In the Docker deployment the database runs as the `mongodb` service, bound to
+`127.0.0.1:27017` on the host and persisted in the `mongodb_data` volume. Set
+`DATABASE_URL` in `.env` to use an external/managed MongoDB instead.
+
+```bash
+# Open a shell against the containerized database
+./scripts/compose.sh exec mongodb mongosh \
+  -u admin -p "$(awk -F= '$1=="MONGO_ROOT_PASSWORD"{print $2}' .env)" \
+  --authenticationDatabase admin transparency_check
+```
 
 ## Commands
 
@@ -238,25 +289,25 @@ npm run format           # Auto-format code
 
 # Installation
 npm run install:all      # Install all workspace dependencies
+
+# Deployment (engine-agnostic: picks Docker or Podman)
+./init.sh                # First-time setup, env + secrets + HTTPS
+bun run docker:up        # Start the stack
+bun run docker:logs      # Tail all logs
+bun run docker:ps        # Service status
+bun run docker:down      # Stop the stack
+bun run deploy           # Rebuild and restart changed services
 ```
 
 ## Tech Stack
 
 - **Frontend**: Svelte 5, SvelteKit 2, Vite, PWA
-- **Backend**: SvelteKit API routes, Node.js
-- **Database**: SQLite3 (native)
-- **AI**: OpenAI GPT-4
+- **Backend**: SvelteKit API routes, Bun/Node runtime
+- **Database**: MongoDB 8
+- **Auth**: Better Auth (email/password + GitHub OAuth)
+- **AI**: OpenAI / OpenRouter
 - **Mobile**: Capacitor (Android)
-- **Deployment**: Docker, Nginx, PM2
-
-## Docker Deployment
-
-The docker-compose setup builds and deploys both apps:
-
-- **Client**: Nginx serving static files on port 8080 (HTTP) and 8443 (HTTPS)
-- **Server**: Node.js API server on port 3000
-
-See [README-SSL.md](README-SSL.md) for HTTPS setup.
+- **Deployment**: Docker or Podman Compose, nginx (static + TLS proxy), Let's Encrypt
 
 ## Capacitor Mobile App
 
@@ -269,9 +320,11 @@ npx cap sync android
 npx cap open android
 ```
 
-Use your deployed API origin for `VITE_API_BASE_URL` (for example, `https://api.example.com`).
+Use your deployed API origin for `VITE_API_BASE_URL` (for example, `https://example.com`).
+Leave it empty for the web/Docker build so the PWA calls `/api` on its own origin
+through the proxy.
 
-See [capacitor.config.json](capacitor.config.json) for mobile app configuration.
+See [apps/client/capacitor.config.json](apps/client/capacitor.config.json) for mobile app configuration.
 
 ## Configuration Files
 
@@ -285,6 +338,5 @@ Each app has its own:
 
 ## Additional Documentation
 
-- [README-SSL.md](README-SSL.md) — HTTPS setup with Let's Encrypt
-- [MONOREPO.md](MONOREPO.md) — Detailed monorepo structure guide
-- [.github/copilot-instructions.md](.github/copilot-instructions.md) — AI coding assistant context
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — VPS deployment, HTTPS, admin panel, backups
+- [.env.example](.env.example) — Every supported environment variable

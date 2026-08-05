@@ -1,26 +1,59 @@
 # .github/workflows/deploy.yml
 name: Deploy to VPS
+
 on:
   push:
     branches: [master]
+  workflow_dispatch:
+
+# Never let two deploys build on the VPS at the same time.
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      
-      - name: Deploy to VPS
-        uses: appleboy/ssh-action@master
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_SSH_PORT || 22 }}
+          script_stops: true
           script: |
-            cd ~/TransparencyCheck
-            git pull origin master
-            # Container-only deploy: build + run via Podman Compose.
-            # Root .env is consumed by compose for interpolation and passed into the server container via env_file.
-            podman compose --env-file .env down
-            podman compose --env-file .env up -d --build
-            echo "🚀 Deployment successful! App running at: http://$(curl -s ifconfig.me):8080"
+            set -euo pipefail
+            APP_DIR="${HOME}/TransparencyCheck"
+
+            cd "$APP_DIR"
+            git fetch origin master
+            # Hard reset rather than pull: a deploy target should always end up
+            # exactly at origin/master, and .env is untracked so it survives.
+            git reset --hard origin/master
+
+            if [ ! -f .env ]; then
+              echo "::error::No .env on the VPS. Run ./init.sh there once to create it."
+              exit 1
+            fi
+
+            # No `down` first: compose recreates only what changed, so the site
+            # stays up instead of going dark for the length of a rebuild.
+            ./scripts/compose.sh up -d --build --remove-orphans
+
+            # Drop dangling build layers so a small VPS disk does not creep up.
+            if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+              docker image prune -f >/dev/null || true
+            elif command -v podman >/dev/null 2>&1; then
+              podman image prune -f >/dev/null || true
+            fi
+
+            DOMAIN="$(awk -F= '$1 == "DOMAIN" { print $2; exit }' .env)"
+            if [ -n "$DOMAIN" ]; then
+              echo "🚀 Deployed: https://${DOMAIN}"
+            else
+              echo "🚀 Deployed: http://$(curl -fsS4 --max-time 5 ifconfig.me || echo localhost)"
+            fi
+
+            ./scripts/compose.sh ps

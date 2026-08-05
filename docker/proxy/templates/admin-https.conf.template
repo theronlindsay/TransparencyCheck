@@ -1,0 +1,32 @@
+# Admin panel over HTTPS. Uses the same certificate lineage as the main site,
+# which covers ${ADMIN_DOMAIN} as a SAN when its DNS resolved to this host at
+# issuance time (init.sh only sets ADMIN_DOMAIN when that is true).
+server {
+	listen 80;
+	server_name ${ADMIN_DOMAIN};
+
+	location ^~ /.well-known/acme-challenge/ {
+		root /var/www/certbot;
+		default_type text/plain;
+		access_log off;
+	}
+
+	location / {
+		return 301 https://$host$request_uri;
+	}
+}
+
+server {
+	listen 443 ssl;
+	http2 on;
+	server_name ${ADMIN_DOMAIN};
+
+	ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
+	ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+	include /etc/nginx/tls-params.conf;
+
+	add_header Strict-Transport-Security "max-age=31536000" always;
+	add_header X-Robots-Tag "noindex, nofollow" always;
+
+	include /etc/nginx/conf.d/admin-proxy.inc;
+}
