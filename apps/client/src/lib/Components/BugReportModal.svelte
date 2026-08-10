@@ -15,7 +15,7 @@
 	let submitSuccess = $state('');
 	let dropzoneShell = $state();
 	function resolveDevUploadthingUrl() {
-		const configuredBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+		const configuredBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:1776';
 
 		try {
 			const parsed = new URL(configuredBase);
@@ -27,7 +27,7 @@
 			parsed.hash = '';
 			return parsed.toString();
 		} catch {
-			return 'http://localhost:3000/api/uploadthing';
+			return 'http://localhost:1776/api/uploadthing';
 		}
 	}
 	const uploadThingUrl = $derived(

@@ -44,7 +44,7 @@ OPENAI_API_KEY=your-key       # Required - OpenAI for bill summarization
 # Start client dev server (http://localhost:5173)
 bun run dev:client
 
-# Start server dev server (http://localhost:3000)
+# Start server dev server (http://localhost:1776)
 bun run dev:server
 ```
 
@@ -68,7 +68,7 @@ Access the app at:
 - **HTTPS**: https://localhost:8443
 - **HTTP**: http://localhost:8080 (redirects to HTTPS)
 
-The server runs on port 3000 (internal to Docker network).
+The server runs on port 1776 (internal to Docker network).
 
 See [README-SSL.md](README-SSL.md) for Let's Encrypt setup and production HTTPS configuration.
 
@@ -87,7 +87,7 @@ To run the server in production:
 
 ```bash
 cd apps/server
-bun run start  # Runs the server on port 3000
+bun run start  # Runs the server on port 1776
 ```
 
 Serve the client static files (`apps/client/build/`) with Nginx or any static host.
@@ -219,7 +219,7 @@ Database location: `apps/server/src/lib/db/transparency.sqlite` (or `/app/db/tra
 ```bash
 # Development
 npm run dev:client       # Start client dev server (port 5173)
-npm run dev:server       # Start server dev server (port 3000)
+npm run dev:server       # Start server dev server (port 1776)
 
 # Production builds
 npm run build            # Build both client and server
@@ -254,7 +254,7 @@ npm run install:all      # Install all workspace dependencies
 The docker-compose setup builds and deploys both apps:
 
 - **Client**: Nginx serving static files on port 8080 (HTTP) and 8443 (HTTPS)
-- **Server**: Node.js API server on port 3000
+- **Server**: Node.js API server on port 1776
 
 See [README-SSL.md](README-SSL.md) for HTTPS setup.
 
