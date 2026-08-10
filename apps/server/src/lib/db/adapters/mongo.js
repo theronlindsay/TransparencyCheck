@@ -1,10 +1,16 @@
 import Bill from '$lib/db/models/Bill.js';
 import BillAction from '$lib/db/models/BillAction.js';
 import BillTextVersion from '$lib/db/models/BillTextVersion.js';
+import { connectMongoose } from '$lib/db/mongoose.js';
+
+async function ready() {
+	await connectMongoose();
+}
 
 // ─── Writes ─────────────────────────────────────────────────────────────────
 
 export async function saveBill(billId, billStatus, bill) {
+	await ready();
 	const data = {
 		billNumber: bill.number ?? bill.billNumber,
 		congress: bill.congress,
@@ -53,6 +59,7 @@ export async function saveBill(billId, billStatus, bill) {
 }
 
 export async function saveBillActions(billId, actions) {
+	await ready();
 	await BillAction.deleteMany({ billId });
 
 	if (actions.length > 0) {
@@ -70,6 +77,7 @@ export async function saveBillActions(billId, actions) {
 }
 
 export async function saveTextVersion(billId, version, format, content, isFetched) {
+	await ready();
 	const versionType = version.type ?? '';
 	const formatType = format.type ?? '';
 
@@ -90,6 +98,7 @@ export async function saveTextVersion(billId, version, format, content, isFetche
 const CURRENT_CONGRESS = 119;
 
 export async function getBillById(billId) {
+	await ready();
 	if (billId == null || billId === '') return null;
 	const s = String(billId).trim();
 	const candidates = [s, s.toLowerCase(), s.toUpperCase()];
@@ -104,18 +113,22 @@ export async function getBillById(billId) {
 }
 
 export async function getBillTextVersions(billId) {
+	await ready();
 	return await BillTextVersion.find({ billId }).sort({ date: -1 }).lean();
 }
 
 export async function getBillActions(billId) {
+	await ready();
 	return await BillAction.find({ billId }).sort({ actionDate: -1 }).lean();
 }
 
 export async function getRecentBills(limit = 20) {
+	await ready();
 	return await Bill.find({ congress: CURRENT_CONGRESS }).sort({ updateDateIncludingText: -1 }).limit(limit).lean();
 }
 
 export async function searchBills({ searchQuery, status, chamber, sponsor, dateFrom, dateTo, congress, limit = 40 } = {}) {
+	await ready();
 	const filter = { congress: congress ?? CURRENT_CONGRESS };
 
 	if (searchQuery) {

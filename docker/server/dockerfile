@@ -12,6 +12,9 @@ RUN bun install --frozen-lockfile
 
 COPY . .
 
+# svelte-kit sync was skipped/failed during bun install (sources not copied yet).
+RUN cd apps/server && bun run prepare
+
 # Build server only
 RUN bun run build:server
 
