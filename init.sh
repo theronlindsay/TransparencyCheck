@@ -24,7 +24,7 @@ MONGO_ROOT_PASSWORD=password123
 DATABASE_URL=mongodb://admin:password123@mongodb:27017/transparency_check?authSource=admin
 
 # --- Networking ---
-# Leave VITE_API_BASE_URL empty for Docker/Nginx environments to use relative paths
+# Leave VITE_API_BASE_URL empty so the browser uses relative /api paths (Dokploy proxies to the server)
 VITE_API_BASE_URL=
 EOF
   echo "✅ Default .env created."

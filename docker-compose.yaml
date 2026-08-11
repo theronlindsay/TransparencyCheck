@@ -39,18 +39,32 @@ services:
       - server_logs:/app/logs
     ports:
       - "1776:1776"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "bun",
+          "-e",
+          "fetch('http://127.0.0.1:1776/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
 
   client:
     build:
       context: .
       dockerfile: docker/client/dockerfile
       args:
-        VITE_API_BASE_URL: "" # Empty string for nginx proxy - nginx will route /api/ to server:1776
+        # Empty = relative /api paths; Dokploy/Traefik routes /api to the server
+        VITE_API_BASE_URL: ""
     depends_on:
       - server
+    environment:
+      - PORT=8080
     ports:
-      - "8080:80"  # Change to 8080:80 for production server
-      # - "8443:443"
+      - "8080:8080"
 
 volumes:
   pdf-cache:

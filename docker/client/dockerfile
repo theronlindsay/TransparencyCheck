@@ -21,9 +21,15 @@ RUN cd apps/client && bun run prepare
 # Build client only
 RUN bun run build:client
 
-FROM docker.io/library/nginx:alpine
+FROM docker.io/oven/bun:1 AS runtime
 
-COPY docker/client/nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=build /app/apps/client/build /usr/share/nginx/html
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=8080
 
-EXPOSE 80 443
+COPY --from=build /app/apps/client/build ./build
+COPY docker/client/serve.js ./serve.js
+
+EXPOSE 8080
+
+CMD ["bun", "serve.js"]

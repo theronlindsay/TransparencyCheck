@@ -81,7 +81,7 @@ jobs:
           tags: ${{ steps.meta-client.outputs.tags }}
           labels: ${{ steps.meta-client.outputs.labels }}
           build-args: |
-            # Use relative /api paths so nginx proxy can route to `server:1776`
+            # Relative /api paths; Dokploy/Traefik routes /api to the server
             VITE_API_BASE_URL=
           cache-from: type=gha
           cache-to: type=gha,mode=max

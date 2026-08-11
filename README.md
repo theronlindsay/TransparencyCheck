@@ -52,25 +52,21 @@ bun run dev:server
 
 ### Option 1: Docker Deployment (Recommended)
 
-The easiest way to deploy is using Docker Compose, which runs both client and server:
+The easiest way to deploy is using Docker Compose (or Dokploy), which runs both client and server:
 
 ```bash
-# Generate SSL certificates (see README-SSL.md for production certs)
-.\generate-ssl-certs.ps1  # Windows
-./generate-ssl-certs.sh   # Linux/Mac
-
 # Build and start containers
 docker compose up -d
 ```
 
 Access the app at:
 
-- **HTTPS**: https://localhost:8443
-- **HTTP**: http://localhost:8080 (redirects to HTTPS)
+- **Client**: http://localhost:8080
+- **Server API**: http://localhost:1776
 
-The server runs on port 1776 (internal to Docker network).
+TLS and `/api` routing should be handled by Dokploy/Traefik in production (not by the client container).
 
-See [README-SSL.md](README-SSL.md) for Let's Encrypt setup and production HTTPS configuration.
+The server listens on port 1776.
 
 ### Option 2: Manual Build
 
@@ -90,7 +86,7 @@ cd apps/server
 bun run start  # Runs the server on port 1776
 ```
 
-Serve the client static files (`apps/client/build/`) with Nginx or any static host.
+Serve the client static files (`apps/client/build/`) with any static host, or use the Bun `docker/client/serve.js` image. API proxying is handled by Dokploy/Traefik.
 
 ### Option 3: Android App (Capacitor)
 
@@ -151,8 +147,8 @@ TransparencyCheck/
 │       └── vite.config.js
 ├── docker/
 │   ├── client/
-│   │   ├── dockerfile
-│   │   └── nginx.conf       # HTTPS + redirect config
+│   │   ├── dockerfile       # Builds static client + Bun static server
+│   │   └── serve.js         # Serves apps/client/build (Dokploy proxies /api)
 │   ├── server/
 │   │   └── dockerfile
 ├── docker-compose           # Orchestrates client + server
@@ -253,7 +249,7 @@ npm run install:all      # Install all workspace dependencies
 
 The docker-compose setup builds and deploys both apps:
 
-- **Client**: Nginx serving static files on port 8080 (HTTP) and 8443 (HTTPS)
+- **Client**: Bun static server on port 8080 (Dokploy/Traefik terminates TLS and proxies `/api`)
 - **Server**: Node.js API server on port 1776
 
 See [README-SSL.md](README-SSL.md) for HTTPS setup.

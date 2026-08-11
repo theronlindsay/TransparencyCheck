@@ -71,9 +71,14 @@ async function initBillSync() {
 	console.log(`⏱️  Bill refresh scheduled every ${POLL_INTERVAL_MS / 60000} minutes.`);
 }
 
+const QUIET_PATHS = new Set(['/', '/health', '/favicon.ico']);
+
 // Export a handle function so SvelteKit loads this hooks file
 export async function handle({ event, resolve }) {
-	console.log('🪝 handle called:', event.request.method, event.url.pathname);
+	const { pathname } = event.url;
+	if (!QUIET_PATHS.has(pathname)) {
+		console.log('🪝 handle called:', event.request.method, pathname);
+	}
 	// Trigger bill sync on the first request (non-blocking).
 	initBillSync().catch((err) => console.error('❌ initBillSync failed:', err));
 	const corsHeaders = buildCorsHeaders(event);
