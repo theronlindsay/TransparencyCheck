@@ -1,6 +1,6 @@
 <script>
 	import Bill from '$lib/Components/Bill.svelte';
-	import { browser } from '$app/environment';
+	import { onMount } from 'svelte';
 	import { apiUrl } from '$lib/config.js';
 
 	// Store the resolved bills data
@@ -16,7 +16,7 @@
 				throw new Error(`Failed to fetch bills: ${response.status}`);
 			}
 			const bills = await response.json();
-			billsData = bills;
+			billsData = Array.isArray(bills) ? bills : [];
 			isLoading = false;
 		} catch (err) {
 			console.error('Error fetching bills:', err);
@@ -25,11 +25,8 @@
 		}
 	}
 
-	// Fetch bills on mount
-	$effect(() => {
-		if (browser) {
-			fetchBillsFromAPI();
-		}
+	onMount(() => {
+		fetchBillsFromAPI();
 	});
 
 	// Reactive state for filters using Svelte 5 runes

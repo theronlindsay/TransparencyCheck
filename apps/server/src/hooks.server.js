@@ -3,6 +3,7 @@ import {
 	isAdminPasswordConfigured,
 	isAllowedAdminHost
 } from '$lib/server/admin-auth.js';
+import { startBillSync } from '$lib/server/bill-sync.js';
 import { installServerLogging } from '$lib/server/logging.js';
 import { redirect } from '@sveltejs/kit';
 
@@ -15,6 +16,8 @@ const DEFAULT_ALLOWED_ORIGINS = [
 	'https://transparencycheck.app',
 	'https://www.transparencycheck.app'
 ];
+
+const QUIET_PATHS = new Set(['/', '/health', '/favicon.ico']);
 
 const configuredCorsOrigins = (process.env.CORS_ORIGINS || '')
 	.split(',')
@@ -43,10 +46,12 @@ function buildCorsHeaders(event) {
 	};
 }
 
-// Export a handle function so SvelteKit loads this hooks file
 export async function handle({ event, resolve }) {
 	const startedAt = Date.now();
 	const { pathname, hostname } = event.url;
+
+	// Kick off Mongo seed + periodic Congress refresh (no-op after first call).
+	startBillSync();
 
 	const corsHeaders = buildCorsHeaders(event);
 	const isAdminHost = isAllowedAdminHost(hostname);
@@ -56,7 +61,9 @@ export async function handle({ event, resolve }) {
 	event.locals.isAdminHost = isAdminHost;
 	event.locals.isAdminAuthenticated = hasValidAdminSession(event.cookies);
 
-	console.info(`[HTTP] ${event.request.method} ${hostname}${pathname} started`);
+	if (!QUIET_PATHS.has(pathname)) {
+		console.info(`[HTTP] ${event.request.method} ${hostname}${pathname} started`);
+	}
 
 	if (isAdminPath && !isAdminHost) {
 		console.warn(`[Admin] Rejected admin route on unexpected host ${hostname}`);
@@ -80,7 +87,6 @@ export async function handle({ event, resolve }) {
 		throw redirect(303, '/admin/cron');
 	}
 
-	// Handle preflight for allowed origins.
 	if (event.request.method === 'OPTIONS') {
 		return new Response(null, {
 			status: 204,
@@ -96,9 +102,11 @@ export async function handle({ event, resolve }) {
 		}
 	}
 
-	console.info(
-		`[HTTP] ${event.request.method} ${hostname}${pathname} completed ${response.status} in ${Date.now() - startedAt}ms`
-	);
+	if (!QUIET_PATHS.has(pathname)) {
+		console.info(
+			`[HTTP] ${event.request.method} ${hostname}${pathname} completed ${response.status} in ${Date.now() - startedAt}ms`
+		);
+	}
 
 	return response;
 }

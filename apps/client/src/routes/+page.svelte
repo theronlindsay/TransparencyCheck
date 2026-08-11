@@ -2,7 +2,7 @@
 	import Bill from '$lib/Components/Bill.svelte';
 	import FilterPanel from '$lib/Components/FilterPanel.svelte';
 	import { apiUrl } from '$lib/config.js';
-	import { browser } from '$app/environment';
+	import { onMount } from 'svelte';
 	import posthog from 'posthog-js';
 
 	// Store the resolved bills data
@@ -102,9 +102,9 @@
 				throw new Error(`Failed to fetch bills: ${response.status}`);
 			}
 			const bills = await response.json();
-			console.log('Bills fetched:', bills.length, 'bills');
-			console.log('First bill sample:', bills[0]);
-			billsData = bills;
+			console.log('Bills fetched:', Array.isArray(bills) ? bills.length : 0, 'bills');
+			console.log('First bill sample:', Array.isArray(bills) ? bills[0] : bills);
+			billsData = Array.isArray(bills) ? bills : [];
 			isLoading = false;
 			console.log(
 				'State updated - isLoading:',
@@ -122,12 +122,10 @@
 		}
 	}
 
-	// Fetch bills on mount (client-side)
-	$effect(() => {
-		if (browser && billsData.length === 0 && !error && !isLoading) {
-			isLoading = true;
-			fetchBillsFromAPI();
-		}
+	// Fetch bills once on mount (avoid $effect — empty results would retrigger forever)
+	onMount(() => {
+		isLoading = true;
+		fetchBillsFromAPI();
 	});
 
 	// Filtered bills
