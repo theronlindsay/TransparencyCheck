@@ -18,11 +18,10 @@ CONGRESS_API_KEY=DEMO_KEY
 # Required for AI summaries (app will run without it, but summaries will be empty)
 OPENAI_API_KEY=
 
-# --- Local Database Configuration ---
-MONGO_ROOT_USER=admin
-MONGO_ROOT_PASSWORD=password123
-DATABASE_URL=mongodb://admin:password123@mongodb:27017/transparency_check?authSource=admin
-
+# --- Database (external Mongo / Dokploy DB service — not in docker-compose) ---
+# Example Dokploy internal URL:
+# DATABASE_URL=mongodb://USER:PASSWORD@<mongo-app-name>:27017/transparency_check?authSource=admin
+DATABASE_URL=
 # Client talks to the dedicated API host (Dokploy: transparencycheck.app → client, api.transparencycheck.app → server)
 VITE_API_BASE_URL=https://api.transparencycheck.app
 BETTER_AUTH_URL=https://api.transparencycheck.app
@@ -78,12 +77,11 @@ echo ""
 echo -e "  ${RED}⚠️  WARNING: To access the app from the internet, you MUST forward${NC}"
 echo -e "  ${RED}   ports 8080 and 1776 in your router settings to this machine.${NC}"
 echo ""
-echo "📊 DATABASE ACCESS:"
-echo "  🔗 Local URI: mongodb://admin:password123@$PRIVATE_IP:27017"
+echo "📊 DATABASE:"
+echo "  Set DATABASE_URL in .env to your Dokploy/external Mongo connection string."
 echo ""
 echo "📝 OPERATIONS:"
 echo "  💡 Tip: Use '$COMPOSE_CMD compose logs -f server' to watch the server."
-echo "  💾 Database Shell: $COMPOSE_CMD compose exec mongodb mongosh" 
 echo "  🔄 Restart: $COMPOSE_CMD compose down && ./init.sh"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 } | tee instructions.txt
