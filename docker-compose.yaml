@@ -2,6 +2,8 @@ services:
   mongodb:
     image: mongo:8.2
     restart: unless-stopped
+    # Cap WiredTiger cache so Mongo doesn't eat the whole Dokploy VPS.
+    command: ['mongod', '--bind_ip_all', '--wiredTigerCacheSizeGB', '0.25']
     environment:
       - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER:-admin}
       - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD:-password123}
@@ -36,6 +38,8 @@ services:
       - BETTER_AUTH_URL=https://api.transparencycheck.app
       - CORS_ORIGINS=https://transparencycheck.app,https://www.transparencycheck.app
       - DATABASE_URL=mongodb://${MONGO_ROOT_USER:-admin}:${MONGO_ROOT_PASSWORD:-password123}@mongodb:27017/transparency_check?authSource=admin
+      # Keep the Bun process from ballooning on small hosts
+      - NODE_OPTIONS=--max-old-space-size=384
     volumes:
       - pdf-cache:/app/.cache
       - server_logs:/app/logs

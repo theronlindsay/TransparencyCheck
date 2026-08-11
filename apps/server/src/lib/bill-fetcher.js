@@ -63,34 +63,34 @@ async function getBillDetails(billUrl) {
 	return data.bill;
 }
 
-// ─── Save ────────────────────────────────────────────────────────────────────
-
-async function saveBillToDatabase(bill) {
+/**
+ * Persist a Congress.gov bill summary/detail.
+ * @param {object} bill
+ * @param {{ detailed?: boolean }} [options] - detailed=false skips per-bill detail/committee fetches (bulk-safe)
+ */
+async function saveBillToDatabase(bill, { detailed = true } = {}) {
 	const billId = `${bill.type}${bill.number}`;
-	console.log(`\n📝 Processing bill: ${billId}`);
+	console.log(`\n📝 Processing bill: ${billId}${detailed ? '' : ' (lightweight)'}`);
 
 	let detailedBill = bill;
-	if (bill.url) {
+	if (detailed && bill.url) {
 		try {
 			const details = await getBillDetails(bill.url);
 			if (details) detailedBill = details;
 		} catch (err) {
 			console.error(`  ❌ Error fetching details for ${billId}:`, err.message);
 		}
-	} else {
+	} else if (!bill.url) {
 		console.log(`  ⚠️  No URL for bill ${billId}, using summary data only`);
 	}
 
-	// Fetch primary committee name if available
 	const committeesUrl = detailedBill.committees?.url || detailedBill.committeesUrl;
-	if (committeesUrl && CONGRESS_API_KEY) {
+	if (detailed && committeesUrl && CONGRESS_API_KEY) {
 		try {
 			const cUrlObj = new URL(committeesUrl);
 			cUrlObj.searchParams.set('format', 'json');
 			cUrlObj.searchParams.set('api_key', CONGRESS_API_KEY);
-			const commUrl = cUrlObj.toString();
-			
-			const commRes = await fetch(commUrl);
+			const commRes = await fetch(cUrlObj.toString());
 			if (commRes.ok) {
 				const commData = await commRes.json();
 				if (commData.committees && commData.committees.length > 0) {
@@ -107,7 +107,23 @@ async function saveBillToDatabase(bill) {
 
 	await saveBill(billId, billStatus, detailedBill);
 
-	return detailedBill;
+	return {
+		id: billId,
+		type: detailedBill.type,
+		number: detailedBill.number,
+		congress: detailedBill.congress,
+		title: detailedBill.title ?? null,
+		introducedDate: detailedBill.introducedDate ?? null,
+		latestAction: detailedBill.latestAction ?? null,
+		originChamber: detailedBill.originChamber ?? null,
+		originChamberCode: detailedBill.originChamberCode ?? null,
+		updateDate: detailedBill.updateDate ?? null,
+		url: detailedBill.url ?? null,
+		policyArea: detailedBill.policyArea ?? null,
+		sponsors: detailedBill.sponsors ?? null,
+		primaryCommitteeName: detailedBill.primaryCommitteeName ?? null,
+		status: billStatus
+	};
 }
 
 /** Try recent Congresses when a user opens a bill we have not synced yet. */
@@ -134,7 +150,7 @@ export async function importBillBySlugIfMissing(rawSlug) {
 		const b = data.bill;
 		if (!b) continue;
 		try {
-			await saveBillToDatabase(b);
+			await saveBillToDatabase(b, { detailed: true });
 			return `${b.type}${b.number}`;
 		} catch (err) {
 			console.error(`[importBillBySlug] save failed for ${slug}:`, err.message);
@@ -144,33 +160,59 @@ export async function importBillBySlugIfMissing(rawSlug) {
 	return null;
 }
 
-export async function fetchAndStoreBills({ searchQuery, congress, dateFrom, dateTo, limit = 40 } = {}) {
-	const bills = [];
-	for await (const bill of fetchAndStoreBillsGenerator({ searchQuery, congress, dateFrom, dateTo, limit })) {
-		bills.push(bill);
+/**
+ * Bulk fetch + store. Does not keep full bill documents in memory.
+ * @returns {Promise<number>} number of bills processed
+ */
+export async function fetchAndStoreBills({
+	searchQuery,
+	congress,
+	dateFrom,
+	dateTo,
+	limit = 20,
+	detailed = false
+} = {}) {
+	let count = 0;
+	for await (const _bill of fetchAndStoreBillsGenerator({
+		searchQuery,
+		congress,
+		dateFrom,
+		dateTo,
+		limit,
+		detailed
+	})) {
+		count += 1;
 	}
-	return bills;
+	return count;
 }
 
-export async function* fetchAndStoreBillsGenerator({ searchQuery, congress, dateFrom, dateTo, limit = 40 } = {}) {
+export async function* fetchAndStoreBillsGenerator({
+	searchQuery,
+	congress,
+	dateFrom,
+	dateTo,
+	limit = 20,
+	detailed = false
+} = {}) {
 	if (!CONGRESS_API_KEY) {
 		console.error('❌ CONGRESS_API_KEY is not set in environment');
 		throw new Error('CONGRESS_API_KEY is not defined');
 	}
-	console.log(`\n🚀 Starting bill fetch (congress: ${congress ?? 'all'}, limit: ${limit}${searchQuery ? `, query: "${searchQuery}"` : ''})`);
+	console.log(
+		`\n🚀 Starting bill fetch (congress: ${congress ?? 'all'}, limit: ${limit}, detailed: ${detailed}${searchQuery ? `, query: "${searchQuery}"` : ''})`
+	);
 
 	try {
 		const apiParams = new URLSearchParams({
 			api_key: CONGRESS_API_KEY,
 			format: 'json',
-			limit: limit.toString()
+			limit: String(Math.min(Math.max(limit, 1), 50))
 		});
 
 		if (searchQuery) apiParams.append('query', searchQuery);
 		if (dateFrom) apiParams.append('fromDateTime', `${dateFrom}T00:00:00Z`);
 		if (dateTo) apiParams.append('toDateTime', `${dateTo}T23:59:59Z`);
 
-		// Use congress-specific endpoint if provided to avoid old bills surfacing via updateDate
 		const baseUrl = congress
 			? `https://api.congress.gov/v3/bill/${congress}`
 			: `https://api.congress.gov/v3/bill`;
@@ -188,8 +230,8 @@ export async function* fetchAndStoreBillsGenerator({ searchQuery, congress, date
 
 		for (const bill of bills) {
 			try {
-				const detailedBill = await saveBillToDatabase(bill);
-				yield detailedBill;
+				const saved = await saveBillToDatabase(bill, { detailed });
+				yield saved;
 			} catch (err) {
 				console.error(`Error saving bill ${bill.type}${bill.number}:`, err);
 			}

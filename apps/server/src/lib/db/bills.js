@@ -21,10 +21,10 @@ import { getRecentBills } from '$lib/db/repository.js';
 
 export async function syncAndFetchBills() {
 	try {
-		await fetchAndStoreBills({ congress: 119, limit: 40 });
-		return await getRecentBills(100);
+		await fetchAndStoreBills({ congress: 119, limit: 15, detailed: false });
+		return await getRecentBills(50);
 	} catch (err) {
 		console.error('Error syncing bills:', err);
-		return await getRecentBills(100);
+		return await getRecentBills(50);
 	}
 }

@@ -4,12 +4,13 @@ import { ensureBillsSeeded } from '$lib/server/bill-sync.js';
 
 export async function GET() {
 	try {
-		let bills = await getRecentBills(100);
+		let bills = await getRecentBills(50);
 
-		// First deploy / empty DB: pull congress 119 from Congress.gov before responding.
 		if (bills.length === 0) {
-			await ensureBillsSeeded();
-			bills = await getRecentBills(100);
+			// Kick off seed in background; don't hold the request open (avoids RAM spikes / timeouts).
+			ensureBillsSeeded().catch((err) => {
+				console.error('Background bill seed failed:', err);
+			});
 		}
 
 		return json(bills.map((b) => ({ ...b, id: b._id })));

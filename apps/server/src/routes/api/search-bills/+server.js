@@ -178,7 +178,9 @@ export async function GET({ url }) {
 						searchQuery,
 						dateFrom,
 						dateTo,
-						congress: 119
+						congress: 119,
+						limit: 20,
+						detailed: false
 					})) {
 						try {
 							const formattedBill = formatCongressBill(bill);
@@ -198,7 +200,7 @@ export async function GET({ url }) {
 								`Streamed bill ${localCount + congressCount}: ${formattedBill.billNumber}`
 							);
 						} catch (error) {
-							console.error(`Error processing bill ${bill.type}${bill.number}:`, error);
+							console.error(`Error processing streamed bill:`, error);
 						}
 					}
 
@@ -226,42 +228,26 @@ export async function GET({ url }) {
 			});
 		}
 
-		// Non-streaming response
-		const bills = await fetchAndStoreBills({ searchQuery, dateFrom, dateTo, congress: 119 });
-		const formattedBills = bills.map((bill) => formatCongressBill(bill));
-
-		// Apply filters
-		let filteredBills = formattedBills;
-
-		if (chamber && chamber !== 'all') {
-			filteredBills = filteredBills.filter((bill) => bill.originChamber === chamber);
-		}
-
-		if (sponsor) {
-			const sponsorLower = sponsor.toLowerCase();
-			filteredBills = filteredBills.filter((bill) => {
-				const sponsorsArray = Array.isArray(bill.sponsors) ? bill.sponsors : [];
-				const sponsorStr = sponsorsArray
-					.map((s) => (s ? `${s.firstName || ''} ${s.lastName || ''} ${s.fullName || ''}` : ''))
-					.join(' ')
-					.toLowerCase();
-				return sponsorStr.includes(sponsorLower);
-			});
-		}
-
-		if (status && status !== 'all') {
-			filteredBills = filteredBills.filter((bill) => bill.status === status);
-		}
-
-		if (dateFrom) {
-			filteredBills = filteredBills.filter(
-				(bill) => bill.updateDate && bill.updateDate >= dateFrom
-			);
-		}
-
-		if (dateTo) {
-			filteredBills = filteredBills.filter((bill) => bill.updateDate && bill.updateDate <= dateTo);
-		}
+		// Non-streaming: sync a small batch, then read filtered results from Mongo.
+		await fetchAndStoreBills({
+			searchQuery,
+			dateFrom,
+			dateTo,
+			congress: 119,
+			limit: 20,
+			detailed: false
+		});
+		const localBills = await searchBills({
+			searchQuery,
+			status,
+			chamber,
+			sponsor,
+			dateFrom,
+			dateTo,
+			congress: 119,
+			limit: 80
+		});
+		const filteredBills = localBills.map(formatLocalBill);
 
 		return json({
 			bills: filteredBills,

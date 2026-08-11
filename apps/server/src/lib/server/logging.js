@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readSync, statSync } from 'node:fs';
 import path from 'node:path';
 import util from 'node:util';
 import { fileURLToPath } from 'node:url';
@@ -62,7 +62,7 @@ function createLoggerState() {
 		installed: false,
 		originalConsole,
 		runtimeLines: [],
-		maxRuntimeLines: 2000
+		maxRuntimeLines: 500
 	};
 }
 
@@ -155,12 +155,23 @@ export function getLogFilePath() {
 
 export function readServerLogs({ limit = 600 } = {}) {
 	const state = installServerLogging();
+	const maxLines = Number.isFinite(limit) && limit > 0 ? limit : 600;
 	let fileLines = [];
 
 	try {
 		ensureLogDirectory(state.filePath);
 		if (existsSync(state.filePath)) {
-			fileLines = readFileSync(state.filePath, 'utf8').split('\n').filter(Boolean);
+			// Read only the tail of the file to avoid loading multi-MB logs into RAM.
+			const { size } = statSync(state.filePath);
+			const maxBytes = Math.min(size, 512 * 1024);
+			const fd = openSync(state.filePath, 'r');
+			try {
+				const buf = Buffer.alloc(maxBytes);
+				readSync(fd, buf, 0, maxBytes, Math.max(0, size - maxBytes));
+				fileLines = buf.toString('utf8').split('\n').filter(Boolean);
+			} finally {
+				closeSync(fd);
+			}
 		}
 	} catch (error) {
 		state.originalConsole.error('[Logging] Failed to read log file:', error);
@@ -172,6 +183,6 @@ export function readServerLogs({ limit = 600 } = {}) {
 
 	return {
 		filePath: state.filePath,
-		lines: Number.isFinite(limit) && limit > 0 ? fileLines.slice(-limit) : fileLines
+		lines: fileLines.slice(-maxLines)
 	};
 }
