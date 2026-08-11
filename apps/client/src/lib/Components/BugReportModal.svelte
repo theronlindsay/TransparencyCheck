@@ -18,7 +18,7 @@
 		const configuredBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:1776';
 
 		try {
-			const parsed = new URL(configuredBase);
+			const parsed = new URL(configuredBase || 'http://localhost:1776');
 			if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
 				parsed.protocol = 'http:';
 			}

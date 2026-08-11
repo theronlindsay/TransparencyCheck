@@ -19,6 +19,21 @@ const trustedOriginsFromEnv = (process.env.BETTER_AUTH_TRUSTED_ORIGINS || '')
 
 const trustedOrigins = [...new Set([...defaultTrustedOrigins, ...trustedOriginsFromEnv])];
 
+const baseURL = (process.env.BETTER_AUTH_URL || 'https://api.transparencycheck.app').replace(
+	/\/$/,
+	''
+);
+
+const useCrossSubdomainCookies = /transparencycheck\.app$/i.test(
+	(() => {
+		try {
+			return new URL(baseURL).hostname;
+		} catch {
+			return '';
+		}
+	})()
+);
+
 let authPromise;
 
 // Lazily initialize auth so image builds do not require a live MongoDB host.
@@ -28,14 +43,25 @@ export function getAuth() {
 			const db = await mongo();
 
 			return betterAuth({
+				baseURL,
 				database: mongodbAdapter(db),
 				trustedOrigins,
+				...(useCrossSubdomainCookies
+					? {
+							advanced: {
+								crossSubDomainCookies: {
+									enabled: true,
+									domain: 'transparencycheck.app'
+								}
+							}
+						}
+					: {}),
 				user: {
 					additionalFields: {
-						subscriptionTier: {
-							type: "string",
+						subscriptionTiers: {
+							type: 'string',
 							required: false,
-							defaultValue: "free"
+							defaultValue: 'free'
 						}
 					}
 				},

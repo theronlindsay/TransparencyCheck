@@ -1,6 +1,6 @@
 /**
  * Minimal static file server for the SvelteKit client build.
- * API proxying is handled by Dokploy/Traefik — this only serves frontend assets.
+ * The API lives on api.transparencycheck.app — this only serves frontend assets.
  */
 import { join, normalize, extname } from 'path';
 
@@ -54,6 +54,15 @@ Bun.serve({
 	port,
 	async fetch(req) {
 		const { pathname } = new URL(req.url);
+
+		// API / health belong on the server service. Returning HTML here hides Dokploy misrouting.
+		if (pathname === '/api' || pathname.startsWith('/api/') || pathname === '/health') {
+			return new Response('Not Found — API requests must be routed to the server service', {
+				status: 404,
+				headers: { 'content-type': 'text/plain; charset=utf-8' }
+			});
+		}
+
 		const filePath = safePath(pathname);
 		const file = Bun.file(filePath);
 

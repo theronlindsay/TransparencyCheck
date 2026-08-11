@@ -40,7 +40,7 @@ jobs:
 
       - name: Build Web Assets
         env:
-          VITE_API_BASE_URL: https://transparencycheck.app
+          VITE_API_BASE_URL: https://api.transparencycheck.app
         run: bun run build:client
 
       - name: Sync Capacitor

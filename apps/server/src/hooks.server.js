@@ -11,7 +11,9 @@ const DEFAULT_ALLOWED_ORIGINS = [
 	'http://127.0.0.1:5173',
 	'https://localhost',
 	'capacitor://localhost',
-	'http://localhost'
+	'http://localhost',
+	'https://transparencycheck.app',
+	'https://www.transparencycheck.app'
 ];
 
 const configuredCorsOrigins = (process.env.CORS_ORIGINS || '')

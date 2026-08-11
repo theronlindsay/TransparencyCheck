@@ -61,10 +61,10 @@ docker compose up -d
 
 Access the app at:
 
-- **Client**: http://localhost:8080
-- **Server API**: http://localhost:1776
+- **Client**: http://localhost:8080 (production: https://transparencycheck.app)
+- **Server API**: http://localhost:1776 (production: https://api.transparencycheck.app)
 
-TLS and `/api` routing should be handled by Dokploy/Traefik in production (not by the client container).
+In Dokploy, point `transparencycheck.app` at the client service and `api.transparencycheck.app` at the server. Build the client with `VITE_API_BASE_URL=https://api.transparencycheck.app`.
 
 The server listens on port 1776.
 
@@ -94,7 +94,7 @@ Build the client as an Android APK:
 
 ```bash
 cd apps/client
-VITE_API_BASE_URL=https://transparencycheck.app bun run build
+VITE_API_BASE_URL=https://api.transparencycheck.app bun run build
 bunx cap sync android
 bunx cap open android  # Opens in Android Studio
 ```
@@ -148,7 +148,7 @@ TransparencyCheck/
 ├── docker/
 │   ├── client/
 │   │   ├── dockerfile       # Builds static client + Bun static server
-│   │   └── serve.js         # Serves apps/client/build (Dokploy proxies /api)
+│   │   └── serve.js         # Serves apps/client/build (API is api.transparencycheck.app)
 │   ├── server/
 │   │   └── dockerfile
 ├── docker-compose           # Orchestrates client + server
@@ -249,8 +249,8 @@ npm run install:all      # Install all workspace dependencies
 
 The docker-compose setup builds and deploys both apps:
 
-- **Client**: Bun static server on port 8080 (Dokploy/Traefik terminates TLS and proxies `/api`)
-- **Server**: Node.js API server on port 1776
+- **Client**: Bun static server on port 8080 (`transparencycheck.app`)
+- **Server**: API on port 1776 (`api.transparencycheck.app`)
 
 See [README-SSL.md](README-SSL.md) for HTTPS setup.
 

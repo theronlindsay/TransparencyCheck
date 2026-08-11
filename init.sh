@@ -23,9 +23,10 @@ MONGO_ROOT_USER=admin
 MONGO_ROOT_PASSWORD=password123
 DATABASE_URL=mongodb://admin:password123@mongodb:27017/transparency_check?authSource=admin
 
-# --- Networking ---
-# Leave VITE_API_BASE_URL empty so the browser uses relative /api paths (Dokploy proxies to the server)
-VITE_API_BASE_URL=
+# Client talks to the dedicated API host (Dokploy: transparencycheck.app → client, api.transparencycheck.app → server)
+VITE_API_BASE_URL=https://api.transparencycheck.app
+BETTER_AUTH_URL=https://api.transparencycheck.app
+CORS_ORIGINS=https://transparencycheck.app,https://www.transparencycheck.app
 EOF
   echo "✅ Default .env created."
 else

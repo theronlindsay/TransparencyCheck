@@ -1,41 +1,42 @@
 /**
  * API Configuration
  *
- * When running in Static Client (Capacitor), API calls go to the VPS server.
- * When running in browser on the VPS, API calls use relative paths.
+ * Production: client is transparencycheck.app, API is api.transparencycheck.app.
+ * Local dev: empty base URL so Vite proxies /api → localhost:1776.
  */
+
+export const PRODUCTION_APP_ORIGIN = 'https://transparencycheck.app';
+export const PRODUCTION_API_ORIGIN = 'https://api.transparencycheck.app';
 
 const envBase = import.meta.env.VITE_API_BASE_URL;
 const isDev = import.meta.env.DEV;
-// Force relative paths during local development so Better Auth doesn't hit CORS errors when talking to production
+
 const API_BASE_URL = isDev
 	? ''
-	: typeof envBase !== 'undefined'
-		? envBase
-		: 'https://transparencycheck.app';
+	: typeof envBase === 'string' && envBase.length > 0
+		? envBase.replace(/\/$/, '')
+		: PRODUCTION_API_ORIGIN;
 
-// Log API configuration on startup for debugging (visible in browser console and Android Logcat)
 console.log('🌐 API Configuration Loaded');
 console.log('   Mode:', isDev ? 'Development' : 'Production');
 console.log('   VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL);
-console.log('   API_BASE_URL:', API_BASE_URL);
-console.log('   Empty base URL means relative paths (same origin)');
+console.log('   API_BASE_URL:', API_BASE_URL || '(relative / Vite proxy)');
 
 /**
- * Get the base URL for API calls
- * Returns empty string for browser (relative paths), or VPS URL for Static Client
+ * Origin for API calls (no trailing slash). Empty in local dev (Vite proxy).
  */
 export function getApiBaseUrl() {
 	return API_BASE_URL;
 }
 
 /**
- * Build a full API URL
+ * Build a full API URL.
  * @param {string} path - API path starting with /
- * @returns {string} Full URL for the API endpoint
+ * @returns {string}
  */
 export function apiUrl(path) {
-	const fullUrl = `${getApiBaseUrl()}${path}`;
+	const normalized = path.startsWith('/') ? path : `/${path}`;
+	const fullUrl = `${getApiBaseUrl()}${normalized}`;
 	console.log(`🔗 API Request: ${fullUrl}`);
 	return fullUrl;
 }
