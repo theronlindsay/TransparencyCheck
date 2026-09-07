@@ -14,12 +14,9 @@
 		"prepare": "svelte-kit sync || echo ''",
 		"format": "prettier --write .",
 		"lint": "prettier --check . && eslint .",
-		"test": "node --test src/lib/openfec-candidate-match.test.js",
+		"test": "node --test src/lib/openfec-candidate-match.test.js src/lib/server/resource-limits.test.js",
 		"fec:duplicates": "node repair-fec-candidate-ids.js",
-		"fec:repair": "node repair-fec-candidate-ids.js --apply",
-		"cron:sync-fec-bulk": "curl -sS \"http://localhost:1776/api/cron/sync-fec-bulk?secret=dev_secret\"",
-		"cron:stocks": "curl -sS \"http://localhost:1776/api/cron/sync-stocks?secret=dev_secret\"",
-		"cron:sync-finance": "curl -sS \"http://localhost:1776/api/cron/sync-finance?secret=dev_secret\""
+		"fec:repair": "node repair-fec-candidate-ids.js --apply"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-node": "^5.3.3",

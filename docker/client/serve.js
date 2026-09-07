@@ -55,7 +55,7 @@ Bun.serve({
 	async fetch(req) {
 		const { pathname } = new URL(req.url);
 
-		// API / health belong on the server service. Returning HTML here hides Dokploy misrouting.
+		// API / health belong on the server service. Returning HTML here hides proxy misrouting.
 		if (pathname === '/api' || pathname.startsWith('/api/') || pathname === '/health') {
 			return new Response('Not Found — API requests must be routed to the server service', {
 				status: 404,

@@ -44,8 +44,8 @@
 
 <section class="summary-grid">
 	<article class="summary-card">
-		<p class="eyebrow">File</p>
-		<h3>Server Log Path</h3>
+		<p class="eyebrow">Source</p>
+		<h3>Server Logs</h3>
 		<p class="path">{active.filePath}</p>
 	</article>
 	<article class="summary-card">

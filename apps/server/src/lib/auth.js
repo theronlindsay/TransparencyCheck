@@ -44,7 +44,7 @@ export function getAuth() {
 
 			return betterAuth({
 				baseURL,
-				database: mongodbAdapter(db),
+				database: mongodbAdapter(db, { transaction: false }),
 				trustedOrigins,
 				...(useCrossSubdomainCookies
 					? {

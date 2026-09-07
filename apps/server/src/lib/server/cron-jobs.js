@@ -1,3 +1,4 @@
+import { runExclusiveJob } from './job-guard.js';
 import mongo from '$lib/db/mongo.js';
 import Person from '$lib/db/models/Person.js';
 import { FinanceProfile } from '$lib/db/models/FinanceProfile.js';
@@ -361,7 +362,7 @@ async function resolveDonorRows(db, committees, fecKey, source, bulkSnapshot) {
 	});
 }
 
-export async function refreshRepresentativeFecIdOnly(bioguideId, source = 'admin-refresh-fec-id') {
+async function refreshRepresentativeFecIdOnlyImpl(bioguideId, source = 'admin-refresh-fec-id') {
 	await mongo();
 
 	const fecKey = process.env.OPENFEC_API_KEY?.replace(/`/g, '')?.trim();
@@ -387,7 +388,7 @@ export async function refreshRepresentativeFecIdOnly(bioguideId, source = 'admin
 	};
 }
 
-export async function refreshAllRepresentativeFecIds(source = 'admin-refresh-fec-ids') {
+async function refreshAllRepresentativeFecIdsImpl(source = 'admin-refresh-fec-ids') {
 	await mongo();
 
 	const representatives = await Person.find({
@@ -428,7 +429,7 @@ export async function refreshAllRepresentativeFecIds(source = 'admin-refresh-fec
 	return summary;
 }
 
-export async function refreshRepresentativeFinancialData(bioguideId, source = 'admin-refresh') {
+async function refreshRepresentativeFinancialDataImpl(bioguideId, source = 'admin-refresh') {
 	const db = await mongo();
 
 	const fecKey = process.env.OPENFEC_API_KEY?.replace(/`/g, '')?.trim();
@@ -536,9 +537,7 @@ export async function refreshRepresentativeFinancialData(bioguideId, source = 'a
 	};
 }
 
-export async function rebuildRepresentativeFinanceCachesFromBulk(
-	source = 'fec-bulk-rebuild-caches'
-) {
+async function rebuildRepresentativeFinanceCachesFromBulkImpl(source = 'fec-bulk-rebuild-caches') {
 	await mongo();
 
 	const representatives = await Person.find({
@@ -580,7 +579,7 @@ export async function rebuildRepresentativeFinanceCachesFromBulk(
 	return summary;
 }
 
-export async function runSyncFecBulkCron(source = 'sync-fec-bulk') {
+async function runSyncFecBulkCronImpl(source = 'sync-fec-bulk') {
 	await mongo();
 
 	const cycle = currentCycleYear();
@@ -591,14 +590,14 @@ export async function runSyncFecBulkCron(source = 'sync-fec-bulk') {
 		datasets: FEC_BULK_METADATA_DATASETS,
 		onlyIfChanged: true
 	});
-	const financeImports = await importFecBulkData({
-		cycle,
-		datasets: FEC_BULK_FINANCE_DATASETS,
-		onlyIfChanged: true
-	});
-	const rebuildSummary = await rebuildRepresentativeFinanceCachesFromBulk(
-		`${source}:rebuild-caches`
-	);
+	const financeImports =
+		process.env.FEC_BULK_FINANCE_ENABLED === 'true'
+			? await importFecBulkData({ cycle, datasets: FEC_BULK_FINANCE_DATASETS, onlyIfChanged: true })
+			: [];
+	const importsChanged = [...metadataImports, ...financeImports].some((entry) => !entry.skipped);
+	const rebuildSummary = importsChanged
+		? await rebuildRepresentativeFinanceCachesFromBulk(`${source}:rebuild-caches`)
+		: { skipped: true, reason: 'unchanged' };
 
 	return {
 		cycle,
@@ -607,7 +606,7 @@ export async function runSyncFecBulkCron(source = 'sync-fec-bulk') {
 	};
 }
 
-export async function runSyncStocksCron() {
+async function runSyncStocksCronImpl() {
 	console.log('[Cron:sync-stocks] Starting stock sync job');
 	await mongo();
 
@@ -632,7 +631,7 @@ export async function runSyncStocksCron() {
 	};
 }
 
-export async function runSyncFinanceCron() {
+async function runSyncFinanceCronImpl() {
 	await mongo();
 	console.log('[Cron:sync-finance] Starting finance sync job');
 
@@ -799,7 +798,7 @@ export async function runSyncFinanceCron() {
 	};
 }
 
-export async function runCheckBillsCron() {
+async function runCheckBillsCronImpl() {
 	await mongo();
 	console.log('[Cron:check-bills] Starting saved-bill status check job');
 
@@ -895,10 +894,12 @@ export async function runAdminCronJob(jobId) {
 	}
 }
 
-export async function runAllAdminCronJobs() {
+async function runAllAdminCronJobsImpl() {
 	const results = [];
 
-	for (const job of ADMIN_CRON_JOBS) {
+	for (const job of ADMIN_CRON_JOBS.filter((entry) =>
+		['sync-finance', 'check-bills'].includes(entry.id)
+	)) {
 		console.log(`[Cron:admin] Running ${job.id}`);
 		const result = await runAdminCronJob(job.id);
 		results.push({ id: job.id, result });
@@ -906,4 +907,48 @@ export async function runAllAdminCronJobs() {
 
 	console.log('[Cron:admin] Finished running all configured cron jobs');
 	return results;
+}
+
+export async function refreshRepresentativeFecIdOnly(...args) {
+	return await runExclusiveJob('refreshRepresentativeFecIdOnly', () =>
+		refreshRepresentativeFecIdOnlyImpl(...args)
+	);
+}
+
+export async function refreshAllRepresentativeFecIds(...args) {
+	return await runExclusiveJob('refreshAllRepresentativeFecIds', () =>
+		refreshAllRepresentativeFecIdsImpl(...args)
+	);
+}
+
+export async function refreshRepresentativeFinancialData(...args) {
+	return await runExclusiveJob('refreshRepresentativeFinancialData', () =>
+		refreshRepresentativeFinancialDataImpl(...args)
+	);
+}
+
+export async function rebuildRepresentativeFinanceCachesFromBulk(...args) {
+	return await runExclusiveJob('rebuildRepresentativeFinanceCachesFromBulk', () =>
+		rebuildRepresentativeFinanceCachesFromBulkImpl(...args)
+	);
+}
+
+export async function runSyncFecBulkCron(...args) {
+	return await runExclusiveJob('runSyncFecBulkCron', () => runSyncFecBulkCronImpl(...args));
+}
+
+export async function runSyncStocksCron(...args) {
+	return await runExclusiveJob('runSyncStocksCron', () => runSyncStocksCronImpl(...args));
+}
+
+export async function runSyncFinanceCron(...args) {
+	return await runExclusiveJob('runSyncFinanceCron', () => runSyncFinanceCronImpl(...args));
+}
+
+export async function runCheckBillsCron(...args) {
+	return await runExclusiveJob('runCheckBillsCron', () => runCheckBillsCronImpl(...args));
+}
+
+export async function runAllAdminCronJobs(...args) {
+	return await runExclusiveJob('runAllAdminCronJobs', () => runAllAdminCronJobsImpl(...args));
 }

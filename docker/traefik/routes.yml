@@ -1,0 +1,42 @@
+http:
+  routers:
+    client:
+      rule: 'Host(`{{ env "APP_DOMAIN" }}`)'
+      entryPoints: [websecure]
+      service: client
+      middlewares: [compression]
+      tls:
+        certResolver: letsencrypt
+    api:
+      rule: 'Host(`{{ env "API_DOMAIN" }}`)'
+      entryPoints: [websecure]
+      service: server
+      middlewares: [api-concurrency, api-rate]
+      tls:
+        certResolver: letsencrypt
+    admin:
+      rule: 'Host(`{{ env "ADMIN_DOMAIN" }}`)'
+      entryPoints: [websecure]
+      service: server
+      tls:
+        certResolver: letsencrypt
+  services:
+    client:
+      loadBalancer:
+        servers:
+          - url: http://client:8080
+    server:
+      loadBalancer:
+        servers:
+          - url: http://server:1776
+  middlewares:
+    compression:
+      compress: {}
+    api-concurrency:
+      inFlightReq:
+        amount: 20
+    api-rate:
+      rateLimit:
+        average: 10
+        burst: 20
+        period: 1s

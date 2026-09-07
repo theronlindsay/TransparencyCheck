@@ -1,90 +1,23 @@
-#!/bin/bash
+#!/bin/sh
+set -eu
+cd "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 
-# Transparency Check - Rapid Setup Script
-# This script prepares the environment and launches the stack with zero manual config.
-
-# Colors
-RED='\033[0;31m'
-NC='\033[0m' # No Color
-
-# 1. Generate default .env if missing
 if [ ! -f .env ]; then
-  echo "📄 Creating default .env for local development..."
-  cat <<EOF > .env
-# --- Required Credentials ---
-# Get a real key at https://api.congress.gov/sign-up/
-CONGRESS_API_KEY=DEMO_KEY
-
-# Required for AI summaries (app will run without it, but summaries will be empty)
-OPENAI_API_KEY=
-
-# --- Database (external Mongo / Dokploy DB service — not in docker-compose) ---
-# Example Dokploy internal URL:
-# DATABASE_URL=mongodb://USER:PASSWORD@<mongo-app-name>:27017/transparency_check?authSource=admin
-DATABASE_URL=
-# Client talks to the dedicated API host (Dokploy: transparencycheck.app → client, api.transparencycheck.app → server)
-VITE_API_BASE_URL=https://api.transparencycheck.app
-BETTER_AUTH_URL=https://api.transparencycheck.app
-CORS_ORIGINS=https://transparencycheck.app,https://www.transparencycheck.app
-EOF
-  echo "✅ Default .env created."
-else
-  echo "ℹ️  Using existing .env file."
+  command -v openssl >/dev/null 2>&1 || { echo 'Install openssl to generate deployment secrets.' >&2; exit 1; }
+  umask 077
+  cp .env.example .env
+  for key in MONGO_ROOT_PASSWORD MONGO_APP_PASSWORD BETTER_AUTH_SECRET ADMIN_PANEL_PASSWORD CRON_SECRET; do
+    value=$(openssl rand -hex 32)
+    sed -i "s/^${key}=$/${key}=${value}/" .env
+  done
+  echo 'Created .env with unique secrets. Set your three domains, ACME_EMAIL and API keys, then run ./init.sh again.'
+  exit 0
 fi
 
-# 2. Check for Podman vs Docker (prefer Podman)
-if command -v podman &> /dev/null; then
-    COMPOSE_CMD="podman"
-    echo "🐳 Using Podman Compose (container-only)..."
-elif command -v docker &> /dev/null; then
-    COMPOSE_CMD="docker"
-    echo "🐳 Podman not found; falling back to Docker Compose (container-only)..."
-else
-    echo "❌ Error: Neither 'podman' nor 'docker' was found. Please install one to continue."
-    exit 1
-fi
-
-# 2.5 Ensure .env is used by compose for interpolation
-if [ ! -f .env ]; then
-  echo "❌ Error: .env not found in project root."
-  exit 1
-fi
-
-# 3. Build and launch the stack
-echo "🏗️  Building and starting containers... (this may take a few minutes on first run)"
-$COMPOSE_CMD compose --env-file .env up -d --build
-
-# 4. Success Output
-PUBLIC_IP=$(curl -s ifconfig.me || echo "Not Available")
-PRIVATE_IP=$(hostname -I | awk '{print $1}' || echo "localhost")
-
-{
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "🚀 TRANSPARENCY CHECK IS NOW DEPLOYED!"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
-echo "🌐 ACCESS PATHS:"
-echo ""
-echo "  [ LOCAL / PRIVATE NETWORK ] - Use this for devices in your house/office"
-echo -e "  🔗 Frontend:  http://$PRIVATE_IP:8080 ${RED}<----- Ctrl/CMD + Click this one${NC}"
-echo "  🔗 Backend:   http://$PRIVATE_IP:1776"
-echo ""
-echo "  [ PUBLIC / EXTERNAL ] - Use this for access from outside your network"
-echo "  🔗 Frontend:  http://$PUBLIC_IP:8080"
-echo "  🔗 Backend:   http://$PUBLIC_IP:1776"
-echo ""
-echo -e "  ${RED}⚠️  WARNING: To access the app from the internet, you MUST forward${NC}"
-echo -e "  ${RED}   ports 8080 and 1776 in your router settings to this machine.${NC}"
-echo ""
-echo "📊 DATABASE:"
-echo "  Set DATABASE_URL in .env to your Dokploy/external Mongo connection string."
-echo ""
-echo "📝 OPERATIONS:"
-echo "  💡 Tip: Use '$COMPOSE_CMD compose logs -f server' to watch the server."
-echo "  🔄 Restart: $COMPOSE_CMD compose down && ./init.sh"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-} | tee instructions.txt
-
-# Strip ANSI color codes from instructions.txt for better readability in text editors
-sed -i 's/\x1b\[[0-9;]*m//g' instructions.txt
+command -v docker >/dev/null 2>&1 || { echo 'Install Docker Engine and the Docker Compose plugin first.' >&2; exit 1; }
+docker compose config --quiet
+# Serialize image builds to reduce peak build RAM. No duplicate host-side build.
+docker compose --parallel 1 build
+docker compose up -d --wait
+echo 'Services are running. Open https://<APP_DOMAIN> or https://<ADMIN_DOMAIN>/admin using the domains in .env.'
+echo 'Check certificate issuance with: docker compose logs traefik'

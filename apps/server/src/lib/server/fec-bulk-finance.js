@@ -201,9 +201,14 @@ export async function buildLocalFinanceSnapshot(db, fecCandidateId, options = {}
 	const principalDonors = coverage.individualContributionsImported
 		? await loadLocalIndividualDonorRows(db, principalCommitteeIds, maxDonors)
 		: [];
-	const authorizedDonors = coverage.individualContributionsImported
-		? await loadLocalIndividualDonorRows(db, includedCommitteeIds, maxDonors)
-		: [];
+	const sameScope =
+		includedCommitteeIds.length === principalCommitteeIds.length &&
+		includedCommitteeIds.every((id) => principalCommitteeIds.includes(id));
+	const authorizedDonors = sameScope
+		? principalDonors
+		: coverage.individualContributionsImported
+			? await loadLocalIndividualDonorRows(db, includedCommitteeIds, maxDonors)
+			: [];
 
 	return {
 		committees,

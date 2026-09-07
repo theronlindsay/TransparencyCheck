@@ -14,13 +14,13 @@
 		"install:all": "bun install",
 		"format": "prettier --write .",
 		"lint": "prettier --check . && eslint .",
-		"docker:build": "podman compose build",
-		"docker:up": "podman compose up -d && echo \"🚀 App running at: http://$(curl -s ifconfig.me || echo 'localhost'):8080\"",
-		"docker:down": "podman compose down",
-		"docker:logs": "podman compose logs -f",
-		"docker:restart": "podman compose restart",
-		"deploy": "bun run build && podman compose up -d --build && echo \"🚀 App running at: http://$(curl -s ifconfig.me || echo 'localhost'):8080\"",
-		"deploy:docker": "bun run build && docker compose up -d --build && echo \"🚀 App running at: http://$(curl -s ifconfig.me || echo 'localhost'):8080\""
+		"docker:build": "docker compose --parallel 1 build",
+		"docker:up": "docker compose up -d --wait",
+		"docker:down": "docker compose down",
+		"docker:logs": "docker compose logs -f",
+		"docker:restart": "docker compose restart",
+		"deploy": "docker compose --parallel 1 build && docker compose up -d --wait",
+		"deploy:docker": "bun run deploy"
 	},
 	"workspaces": [
 		"apps/client",

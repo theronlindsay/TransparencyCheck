@@ -53,7 +53,7 @@ async function getBillDetails(billUrl) {
 	urlObj.searchParams.set('api_key', CONGRESS_API_KEY);
 	const url = urlObj.toString();
 	console.log(`  🔍 Fetching bill details: ${url}`);
-	const response = await fetch(url);
+	const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
 	if (!response.ok) {
 		console.error(`  ❌ Failed to fetch bill details. Status: ${response.status}`);
 		return null;
@@ -90,7 +90,7 @@ async function saveBillToDatabase(bill, { detailed = true } = {}) {
 			const cUrlObj = new URL(committeesUrl);
 			cUrlObj.searchParams.set('format', 'json');
 			cUrlObj.searchParams.set('api_key', CONGRESS_API_KEY);
-			const commRes = await fetch(cUrlObj.toString());
+			const commRes = await fetch(cUrlObj.toString(), { signal: AbortSignal.timeout(15000) });
 			if (commRes.ok) {
 				const commData = await commRes.json();
 				if (commData.committees && commData.committees.length > 0) {
@@ -144,7 +144,7 @@ export async function importBillBySlugIfMissing(rawSlug) {
 
 	for (const congress of IMPORT_BILL_CONGRESSES) {
 		const url = `https://api.congress.gov/v3/bill/${congress}/${billTypePath}/${billNumber}?format=json&api_key=${CONGRESS_API_KEY}`;
-		const res = await fetch(url);
+		const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
 		if (!res.ok) continue;
 		const data = await res.json();
 		const b = data.bill;
@@ -173,7 +173,7 @@ export async function fetchAndStoreBills({
 	detailed = false
 } = {}) {
 	let count = 0;
-	for await (const _bill of fetchAndStoreBillsGenerator({
+	for await (const bill of fetchAndStoreBillsGenerator({
 		searchQuery,
 		congress,
 		dateFrom,
@@ -181,7 +181,7 @@ export async function fetchAndStoreBills({
 		limit,
 		detailed
 	})) {
-		count += 1;
+		if (bill) count += 1;
 	}
 	return count;
 }
@@ -219,7 +219,9 @@ export async function* fetchAndStoreBillsGenerator({
 
 		console.log(`   URL: ${baseUrl}?${apiParams.toString()}`);
 
-		const response = await fetch(`${baseUrl}?${apiParams.toString()}`);
+		const response = await fetch(`${baseUrl}?${apiParams.toString()}`, {
+			signal: AbortSignal.timeout(15000)
+		});
 		if (!response.ok)
 			throw new Error(`Congress.gov API error: ${response.status} ${response.statusText}`);
 

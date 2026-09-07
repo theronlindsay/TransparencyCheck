@@ -71,3 +71,6 @@ apps/server/prisma/apps/server/db
 instructions.txt
 .env
 .claude
+!.env.example
+
+/backups/

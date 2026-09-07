@@ -1,34 +1,124 @@
+x-logging: &logging
+  driver: local
+  options:
+    max-size: '10m'
+    max-file: '3'
+
 services:
+  traefik:
+    image: traefik:v3.6
+    restart: unless-stopped
+    command:
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:?Set ACME_EMAIL in .env}
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+      - --certificatesresolvers.letsencrypt.acme.caserver=${ACME_CA_SERVER:-https://acme-v02.api.letsencrypt.org/directory}
+      - --ping=true
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN in .env}
+      API_DOMAIN: ${API_DOMAIN:?Set API_DOMAIN in .env}
+      ADMIN_DOMAIN: ${ADMIN_DOMAIN:?Set ADMIN_DOMAIN in .env}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./docker/traefik:/etc/traefik/dynamic:ro
+      - certificates:/letsencrypt
+    networks: [frontend]
+    mem_limit: ${PROXY_MEMORY_LIMIT:-128m}
+    logging: *logging
+    healthcheck:
+      test: [CMD, traefik, healthcheck, --ping]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  mongodb:
+    image: ${MONGO_IMAGE:-mongo:7.0}
+    restart: unless-stopped
+    command: [mongod, --wiredTigerCacheSizeGB, '${MONGO_CACHE_GB:-0.25}', --bind_ip_all]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?Set MONGO_ROOT_PASSWORD in .env}
+      MONGO_INITDB_DATABASE: transparency_check
+      MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD:?Set MONGO_APP_PASSWORD in .env}
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+      - ./docker/mongo/init.js:/docker-entrypoint-initdb.d/init.js:ro
+    networks: [database]
+    mem_limit: ${MONGO_MEMORY_LIMIT:-640m}
+    logging: *logging
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          mongosh --quiet --eval 'if (db.getSiblingDB("admin").auth("root", process.env.MONGO_INITDB_ROOT_PASSWORD).ok !== 1) quit(1); if (db.adminCommand({ping:1}).ok !== 1) quit(1)'
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
   server:
     build:
       context: .
       dockerfile: docker/server/dockerfile
     restart: unless-stopped
-    env_file:
-      - .env
+    init: true
     environment:
-      - NODE_ENV=production
-      - PORT=1776
-      - BETTER_AUTH_URL=https://api.transparencycheck.app
-      - CORS_ORIGINS=https://transparencycheck.app,https://www.transparencycheck.app
-      # Provide DATABASE_URL in .env / Dokploy (external Mongo). Do not use hostname "mongodb".
-      - DATABASE_URL=${DATABASE_URL}
-      # Keep the Bun process from ballooning on small hosts
-      - NODE_OPTIONS=--max-old-space-size=384
+      CONGRESS_API_KEY: ${CONGRESS_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENFEC_API_KEY: ${OPENFEC_API_KEY:-}
+      FMP_API_KEY: ${FMP_API_KEY:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      UPLOADTHING_TOKEN: ${UPLOADTHING_TOKEN:-}
+      FEC_BULK_DOWNLOAD_TIMEOUT_MS: ${FEC_BULK_DOWNLOAD_TIMEOUT_MS:-120000}
+      FEC_BULK_MAX_DOWNLOAD_BYTES: ${FEC_BULK_MAX_DOWNLOAD_BYTES:-2147483648}
+      NODE_ENV: production
+      PORT: '1776'
+      HOST: 0.0.0.0
+      DATABASE_URL: mongodb://transparencycheck:${MONGO_APP_PASSWORD:?Set MONGO_APP_PASSWORD in .env}@mongodb:27017/transparency_check?authSource=transparency_check
+      BETTER_AUTH_URL: https://${API_DOMAIN}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env}
+      BETTER_AUTH_TRUSTED_ORIGINS: https://${APP_DOMAIN}
+      CORS_ORIGINS: https://${APP_DOMAIN}
+      ADMIN_PANEL_HOSTS: ${ADMIN_DOMAIN}
+      ADMIN_PANEL_PASSWORD: ${ADMIN_PANEL_PASSWORD:?Set ADMIN_PANEL_PASSWORD in .env}
+      CRON_SECRET: ${CRON_SECRET:?Set CRON_SECRET in .env}
+      # SvelteKit must reconstruct the public origin for admin form CSRF checks.
+      PROTOCOL_HEADER: x-forwarded-proto
+      HOST_HEADER: x-forwarded-host
+      ADDRESS_HEADER: x-forwarded-for
+      XFF_DEPTH: '1'
+      BODY_SIZE_LIMIT: '1M'
+      FEC_BULK_FINANCE_ENABLED: ${FEC_BULK_FINANCE_ENABLED:-false}
+      CONGRESS_MEMBER_SYNC_CONCURRENCY: '2'
+    depends_on:
+      mongodb:
+        condition: service_healthy
     volumes:
-      - pdf-cache:/app/.cache
-      - server_logs:/app/logs
-    ports:
-      - "1776:1776"
-    networks:
-      - dokploy-network
+      - pdf_cache:/app/.cache
+      - fec_tmp:/app/tmp
+    # FEC ZIPs belong on disk, not a RAM-backed /tmp.
+    mem_limit: ${SERVER_MEMORY_LIMIT:-384m}
+    networks: [frontend, database]
+    logging: *logging
     healthcheck:
       test:
         [
-          "CMD",
-          "bun",
-          "-e",
-          "fetch('http://127.0.0.1:1776/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+          CMD,
+          bun,
+          -e,
+          "fetch('http://127.0.0.1:1776/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
         ]
       interval: 30s
       timeout: 5s
@@ -40,18 +130,33 @@ services:
       context: .
       dockerfile: docker/client/dockerfile
       args:
-        VITE_API_BASE_URL: https://api.transparencycheck.app
-    depends_on:
-      - server
+        VITE_API_BASE_URL: https://${API_DOMAIN}
+    restart: unless-stopped
     environment:
-      - PORT=8080
-    ports:
-      - "8080:8080"
+      PORT: '8080'
+    networks: [frontend]
+    mem_limit: ${CLIENT_MEMORY_LIMIT:-96m}
+    logging: *logging
+    healthcheck:
+      test:
+        [
+          CMD,
+          bun,
+          -e,
+          "fetch('http://127.0.0.1:8080/').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
 volumes:
-  pdf-cache:
-  server_logs:
+  mongodb_data:
+  mongodb_config:
+  pdf_cache:
+  fec_tmp:
+  certificates:
 
 networks:
-  dokploy-network:
-    external: true
+  frontend:
+  database:
+    internal: true

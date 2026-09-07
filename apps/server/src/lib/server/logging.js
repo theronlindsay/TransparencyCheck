@@ -1,5 +1,13 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readSync, statSync } from 'node:fs';
+import {
+	createWriteStream,
+	closeSync,
+	existsSync,
+	mkdirSync,
+	openSync,
+	readSync,
+	statSync
+} from 'node:fs';
 import path from 'node:path';
 import util from 'node:util';
 import { fileURLToPath } from 'node:url';
@@ -39,6 +47,7 @@ function formatArgs(args) {
 			colors: false,
 			depth: 6,
 			maxArrayLength: 40,
+			maxStringLength: 2000,
 			breakLength: 120
 		},
 		...args
@@ -47,7 +56,7 @@ function formatArgs(args) {
 
 function createLoggerState() {
 	const filePath = defaultLogFilePath();
-	ensureLogDirectory(filePath);
+	if (process.env.ADMIN_FILE_LOGGING === 'true') ensureLogDirectory(filePath);
 
 	const originalConsole = {
 		log: console.log.bind(console),
@@ -76,7 +85,7 @@ function getLoggerState() {
 
 function writeStructuredLog(level, args) {
 	const state = getLoggerState();
-	const rendered = formatArgs(args);
+	const rendered = formatArgs(args).slice(0, 4000);
 	const line = `[${new Date().toISOString()}] [${level}] ${rendered}`;
 
 	state.runtimeLines.push(line);
@@ -85,8 +94,17 @@ function writeStructuredLog(level, args) {
 	}
 
 	try {
-		ensureLogDirectory(state.filePath);
-		appendFileSync(state.filePath, `${line}\n`, 'utf8');
+		if (process.env.ADMIN_FILE_LOGGING === 'true') {
+			if (!state.stream) {
+				state.stream = createWriteStream(state.filePath, { flags: 'a' });
+				state.stream.on('error', (error) =>
+					state.originalConsole.error('[Logging]', error.message)
+				);
+			}
+			// Drop file copies if the disk falls behind; never build an unbounded write queue.
+			if (!state.stream.destroyed && state.stream.writableLength < 65536)
+				state.stream.write(`${line}\n`);
+		}
 	} catch (error) {
 		state.originalConsole.error('[Logging] Failed to append to log file:', error);
 	}
@@ -155,6 +173,12 @@ export function getLogFilePath() {
 
 export function readServerLogs({ limit = 600 } = {}) {
 	const state = installServerLogging();
+	if (process.env.ADMIN_FILE_LOGGING !== 'true') {
+		return {
+			filePath: 'Recent process logs (persistent history: docker compose logs server)',
+			lines: state.runtimeLines.slice(-Math.min(Math.max(limit, 1), 500))
+		};
+	}
 	const maxLines = Number.isFinite(limit) && limit > 0 ? limit : 600;
 	let fileLines = [];
 

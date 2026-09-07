@@ -22,6 +22,8 @@ FROM docker.io/oven/bun:1 AS runtime
 
 WORKDIR /app
 ENV NODE_ENV=production
+ENV TMPDIR=/app/tmp
+RUN apt-get update && apt-get install -y --no-install-recommends unzip ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # Copy only server files needed at runtime
 COPY --from=build /app/package.json /app/bun.lock ./
@@ -34,7 +36,7 @@ COPY --from=build /app/apps/server/build ./apps/server/build
 COPY docker/server/start.sh ./start.sh
 RUN chmod +x ./start.sh
 
-RUN mkdir -p /app/db /app/.cache /app/logs
+RUN mkdir -p /app/.cache /app/tmp
 
 EXPOSE 1776
 

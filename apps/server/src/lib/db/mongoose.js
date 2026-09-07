@@ -14,7 +14,13 @@ export function connectMongoose() {
 	if (!globalThis._mongooseConnection) {
 		console.log('🔌 Connecting to MongoDB...');
 		globalThis._mongooseConnection = mongoose
-			.connect(uri)
+			.connect(uri, {
+				maxPoolSize: 5,
+				minPoolSize: 0,
+				maxIdleTimeMS: 30000,
+				waitQueueTimeoutMS: 5000,
+				serverSelectionTimeoutMS: 10000
+			})
 			.then((m) => {
 				console.log('✅ MongoDB connected successfully');
 				return m;

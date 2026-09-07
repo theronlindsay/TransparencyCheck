@@ -3,7 +3,7 @@ import { getRecentBills } from '$lib/db/repository.js';
 
 const CURRENT_CONGRESS = 119;
 const POLL_INTERVAL_MS = 15 * 60 * 1000;
-/** Keep bulk sync small on memory-constrained Dokploy hosts. */
+/** Keep bulk sync small on memory-constrained hosts. */
 const SEED_LIMIT = 15;
 const REFRESH_LIMIT = 15;
 
@@ -36,6 +36,7 @@ async function refreshRecentBills() {
  * Safe to call concurrently — only one seed runs at a time.
  */
 export async function ensureBillsSeeded() {
+	if (!process.env.CONGRESS_API_KEY?.trim()) return [];
 	const existing = await getRecentBills(1);
 	if (existing.length > 0) return existing;
 
@@ -69,6 +70,7 @@ export async function ensureBillsSeeded() {
  * Kick off background seed (non-blocking) + periodic refresh.
  */
 export function startBillSync() {
+	if (!process.env.CONGRESS_API_KEY?.trim()) return;
 	if (globalThis._billRefreshInterval) return;
 
 	globalThis._billRefreshInterval = true;

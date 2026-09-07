@@ -38,6 +38,8 @@ const billSchema = new mongoose.Schema(
 	{ _id: false }
 );
 
+billSchema.index({ congress: 1, updateDateIncludingText: -1 });
+
 billSchema.index({ billNumber: 1, congress: 1 }, { unique: true });
 
 export default mongoose.models.Bill ?? mongoose.model('Bill', billSchema);

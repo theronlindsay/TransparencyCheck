@@ -1,3 +1,4 @@
+import { escapeRegex } from './search-utils.js';
 import Bill from '$lib/db/models/Bill.js';
 import BillAction from '$lib/db/models/BillAction.js';
 import BillTextVersion from '$lib/db/models/BillTextVersion.js';
@@ -124,21 +125,34 @@ export async function getBillActions(billId) {
 
 export async function getRecentBills(limit = 20) {
 	await ready();
-	return await Bill.find({ congress: CURRENT_CONGRESS }).sort({ updateDateIncludingText: -1 }).limit(limit).lean();
+	return await Bill.find({ congress: CURRENT_CONGRESS })
+		.sort({ updateDateIncludingText: -1 })
+		.limit(limit)
+		.maxTimeMS(5000)
+		.lean();
 }
 
-export async function searchBills({ searchQuery, status, chamber, sponsor, dateFrom, dateTo, congress, limit = 40 } = {}) {
+export async function searchBills({
+	searchQuery,
+	status,
+	chamber,
+	sponsor,
+	dateFrom,
+	dateTo,
+	congress,
+	limit = 40
+} = {}) {
 	await ready();
 	const filter = { congress: congress ?? CURRENT_CONGRESS };
 
 	if (searchQuery) {
-		const regex = new RegExp(searchQuery, 'i');
+		const regex = new RegExp(escapeRegex(searchQuery), 'i');
 		filter.$or = [{ title: regex }, { billNumber: regex }, { 'policyArea.name': regex }];
 	}
 
 	if (status && status !== 'all') filter.status = status;
 	if (chamber && chamber !== 'all') filter.originChamber = chamber;
-	if (sponsor) filter['sponsors.fullName'] = new RegExp(sponsor, 'i');
+	if (sponsor) filter['sponsors.fullName'] = new RegExp(escapeRegex(sponsor), 'i');
 
 	if (dateFrom || dateTo) {
 		filter.updateDate = {};
@@ -146,6 +160,9 @@ export async function searchBills({ searchQuery, status, chamber, sponsor, dateF
 		if (dateTo) filter.updateDate.$lte = dateTo;
 	}
 
-	return await Bill.find(filter).sort({ updateDateIncludingText: -1 }).limit(limit).lean();
+	return await Bill.find(filter)
+		.sort({ updateDateIncludingText: -1 })
+		.limit(limit)
+		.maxTimeMS(5000)
+		.lean();
 }
-

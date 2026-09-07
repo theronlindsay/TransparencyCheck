@@ -1,6 +1,6 @@
-import { createReadStream, createWriteStream } from 'node:fs';
-import { mkdtemp, rm } from 'node:fs/promises';
-import os from 'node:os';
+import { createReadStream } from 'node:fs';
+import { rm } from 'node:fs/promises';
+import { downloadFile } from './download-file.js';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import readline from 'node:readline';
@@ -416,109 +416,18 @@ function formatBytes(bytes) {
 	return `${(value / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
-function renderProgressBar(progress) {
-	const width = 24;
-	const normalized = Math.max(0, Math.min(1, progress || 0));
-	const filled = Math.round(normalized * width);
-	return `${'='.repeat(filled)}${'.'.repeat(width - filled)}`;
-}
-
 async function downloadToTempFile(url, filename) {
-	const tmpDir = await mkdtemp(path.join(os.tmpdir(), 'tc-fec-'));
-	const filePath = path.join(tmpDir, filename);
-	const timeoutMs = Number.parseInt(process.env.FEC_BULK_DOWNLOAD_TIMEOUT_MS ?? '120000', 10);
-	const controller = new AbortController();
-	let timeout = setTimeout(() => controller.abort(), timeoutMs);
-	const response = await fetch(url, {
-		signal: controller.signal,
-		redirect: 'follow'
-	});
-	if (!response.ok) {
-		clearTimeout(timeout);
-		throw new Error(`Failed to download ${url}: ${response.status} ${response.statusText}`);
-	}
-
-	if (!response.body) {
-		clearTimeout(timeout);
-		throw new Error(`No response body when downloading ${url}`);
-	}
-
-	const totalBytes = Number.parseInt(response.headers.get('content-length') || '0', 10) || 0;
-	const writer = createWriteStream(filePath);
-	const reader = response.body.getReader();
-	const startedAt = Date.now();
-	let downloadedBytes = 0;
 	let nextLogAt = 0;
-
-	try {
-		while (true) {
-			const { done, value } = await reader.read();
-			if (done) {
-				break;
-			}
-
-			clearTimeout(timeout);
-			timeout = setTimeout(() => controller.abort(), timeoutMs);
-
-			downloadedBytes += value.byteLength;
-			if (!writer.write(Buffer.from(value))) {
-				await new Promise((resolve, reject) => {
-					const onDrain = () => {
-						writer.off('error', onError);
-						resolve();
-					};
-					const onError = (error) => {
-						writer.off('drain', onDrain);
-						reject(error);
-					};
-
-					writer.once('drain', onDrain);
-					writer.once('error', onError);
-				});
-			}
-
-			const percent = totalBytes > 0 ? downloadedBytes / totalBytes : 0;
-			if (
-				totalBytes > 0 &&
-				(percent >= nextLogAt || downloadedBytes === totalBytes || nextLogAt === 0)
-			) {
-				const elapsedSeconds = Math.max(1, (Date.now() - startedAt) / 1000);
-				const rate = downloadedBytes / elapsedSeconds;
-				const percentageLabel = `${(percent * 100).toFixed(1)}%`;
-				console.log(
-					`[FEC bulk] Download ${filename} [${renderProgressBar(percent)}] ${percentageLabel} (${formatBytes(downloadedBytes)} / ${formatBytes(totalBytes)} at ${formatBytes(rate)}/s)`
-				);
-				nextLogAt += 0.05;
-			} else if (totalBytes === 0 && downloadedBytes >= nextLogAt) {
-				console.log(
-					`[FEC bulk] Download ${filename} ${formatBytes(downloadedBytes)} received (content-length unavailable)`
-				);
-				nextLogAt = downloadedBytes + 5 * 1024 * 1024;
+	return await downloadFile(url, filename, {
+		timeoutMs: Number(process.env.FEC_BULK_DOWNLOAD_TIMEOUT_MS) || 120000,
+		maxBytes: Number(process.env.FEC_BULK_MAX_DOWNLOAD_BYTES) || 2 * 1024 * 1024 * 1024,
+		onProgress(bytes, total) {
+			if (bytes >= nextLogAt) {
+				console.info(`[FEC bulk] ${filename}: ${formatBytes(bytes)} / ${formatBytes(total)}`);
+				nextLogAt = bytes + 50 * 1024 * 1024;
 			}
 		}
-
-		await new Promise((resolve, reject) => {
-			writer.end((error) => {
-				if (error) {
-					reject(error);
-					return;
-				}
-				resolve();
-			});
-		});
-	} finally {
-		clearTimeout(timeout);
-		reader.releaseLock();
-	}
-
-	console.log(
-		`[FEC bulk] Download complete for ${filename} (${formatBytes(downloadedBytes)}${totalBytes > 0 ? ` / ${formatBytes(totalBytes)}` : ''})`
-	);
-
-	return {
-		filePath,
-		tmpDir
-	};
+	});
 }
 
 async function execFile(command, args) {
@@ -765,7 +674,7 @@ async function importDataset(db, datasetKey, lineIterator, options) {
 
 async function fetchRemoteDatasetMetadata(url) {
 	try {
-		const response = await fetch(url, { method: 'HEAD' });
+		const response = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(15000) });
 		if (!response.ok) {
 			return null;
 		}

@@ -32,4 +32,4 @@ COPY docker/client/serve.js ./serve.js
 
 EXPOSE 8080
 
-CMD ["bun", "serve.js"]
+CMD ["bun", "--smol", "serve.js"]

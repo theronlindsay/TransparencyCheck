@@ -98,9 +98,7 @@ function validateRequest(prompt, requestData) {
 
 function resolveSubscriptionTier(sessionResponse) {
 	const user =
-		sessionResponse?.user ||
-		sessionResponse?.data?.user ||
-		sessionResponse?.session?.user;
+		sessionResponse?.user || sessionResponse?.data?.user || sessionResponse?.session?.user;
 	if (user) {
 		return user.additionalFields?.subscriptionTier || 'free';
 	}
@@ -118,7 +116,10 @@ export async function POST({ request }) {
 			const sessionResponse = await auth.api.getSession({ headers });
 			subscriptionTier = resolveSubscriptionTier(sessionResponse);
 		} catch (sessionErr) {
-			console.warn('[openAI] getSession failed, using free tier:', sessionErr?.message || sessionErr);
+			console.warn(
+				'[openAI] getSession failed, using free tier:',
+				sessionErr?.message || sessionErr
+			);
 		}
 
 		const { prompt, tools, conversationId } = await request.json();
@@ -185,7 +186,6 @@ async function requestAI(prompt, tools, conversationId = null, tier = 'free') {
 
 	const client = new OpenAI({ apiKey: OPENAI_API_KEY });
 
-	console.log('Prompt (Pro):', prompt);
 	if (tools) {
 		console.log('Tools enabled:', tools);
 	}
@@ -207,8 +207,6 @@ async function requestAI(prompt, tools, conversationId = null, tier = 'free') {
 	}
 
 	const response = await client.responses.create(requestOptions);
-
-	console.log('OpenAI Response:', response);
 
 	const outputText = response.output_text || '';
 	return {

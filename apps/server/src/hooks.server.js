@@ -61,7 +61,7 @@ export async function handle({ event, resolve }) {
 	event.locals.isAdminHost = isAdminHost;
 	event.locals.isAdminAuthenticated = hasValidAdminSession(event.cookies);
 
-	if (!QUIET_PATHS.has(pathname)) {
+	if (process.env.LOG_HTTP_REQUESTS === 'true' && !QUIET_PATHS.has(pathname)) {
 		console.info(`[HTTP] ${event.request.method} ${hostname}${pathname} started`);
 	}
 
@@ -102,7 +102,7 @@ export async function handle({ event, resolve }) {
 		}
 	}
 
-	if (!QUIET_PATHS.has(pathname)) {
+	if (process.env.LOG_HTTP_REQUESTS === 'true' && !QUIET_PATHS.has(pathname)) {
 		console.info(
 			`[HTTP] ${event.request.method} ${hostname}${pathname} completed ${response.status} in ${Date.now() - startedAt}ms`
 		);
