@@ -87,8 +87,8 @@ export async function saveTextVersion(billId, version, format, content, isFetche
 		{
 			date: version.date ?? null,
 			url: format.url ?? null,
-			content,
-			contentFetched: isFetched
+			...(content === undefined ? {} : { content }),
+			...(isFetched === undefined ? {} : { contentFetched: isFetched })
 		},
 		{ upsert: true, new: true }
 	);

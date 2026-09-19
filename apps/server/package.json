@@ -14,7 +14,7 @@
 		"prepare": "svelte-kit sync || echo ''",
 		"format": "prettier --write .",
 		"lint": "prettier --check . && eslint .",
-		"test": "node --test src/lib/openfec-candidate-match.test.js src/lib/server/resource-limits.test.js",
+		"test": "node --test src/lib/openfec-candidate-match.test.js src/lib/server/resource-limits.test.js src/lib/server/bill-text-versions.test.js",
 		"fec:duplicates": "node repair-fec-candidate-ids.js",
 		"fec:repair": "node repair-fec-candidate-ids.js --apply"
 	},

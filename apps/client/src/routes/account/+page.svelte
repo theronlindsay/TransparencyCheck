@@ -21,7 +21,7 @@
 		if ($isAuthenticated) {
 			loadingBills = true;
 			try {
-				const res = await fetch(apiUrl('/api/bills/save'));
+				const res = await fetch(apiUrl('/api/bills/save'), { credentials: 'include' });
 				if (res.ok) {
 					const data = await res.json();
 					savedBills = data.bills || [];

@@ -1,5 +1,12 @@
 import { json } from '@sveltejs/kit';
 import { getBillById, getBillTextVersions, fetchAndStoreTextVersions } from '$lib/db/bills.js';
+import { createTextVersionLoader } from '$lib/server/bill-text-versions.js';
+
+const loadTextVersions = createTextVersionLoader({
+	readVersions: getBillTextVersions,
+	fetchVersions: fetchAndStoreTextVersions,
+	getApiKey: () => process.env.CONGRESS_API_KEY
+});
 
 export async function GET({ params }) {
 	try {
@@ -14,28 +21,21 @@ export async function GET({ params }) {
 		}
 
 		const billKey = billData._id;
-		let textVersions = await getBillTextVersions(billKey);
-
-		if (
-			textVersions.length === 0 &&
-			billData.textVersionsCount > 0 &&
-			billData.textVersionsUrl &&
-			process.env.CONGRESS_API_KEY
-		) {
-			textVersions = await fetchAndStoreTextVersions(
-				billKey,
-				billData.textVersionsUrl,
-				process.env.CONGRESS_API_KEY
-			);
-		}
+		const textVersions = await loadTextVersions(billData);
 
 		return json({
 			billId: billKey,
 			textVersions: textVersions || []
 		});
 	} catch (error) {
-		console.error(`Error fetching bill text versions for ${params.id}:`, error);
-		if (error.stack) console.error(error.stack);
-		return json({ error: error.message, stack: error.stack }, { status: 500 });
+		console.error(`Error fetching text versions for ${params.id}:`, error.message);
+		const status = [422, 502, 503].includes(error.status) ? error.status : 502;
+		return json(
+			{ error: 'Bill text versions could not be loaded. Please try again.' },
+			{
+				status,
+				headers: status === 503 ? { 'Retry-After': '5' } : {}
+			}
+		);
 	}
 }

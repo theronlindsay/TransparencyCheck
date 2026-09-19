@@ -4,6 +4,7 @@
 	import PdfViewer from '$lib/Components/PdfViewer.svelte';
 	import AuthModal from '$lib/Components/AuthModal.svelte';
 	import { apiUrl } from '$lib/config.js';
+	import { authReady, currentUser, isAuthenticated } from '$lib/stores/auth.js';
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
 	import { resolve } from '$app/paths';
@@ -21,6 +22,7 @@
 	let actions = $state([]);
 	let isLoading = $state(true);
 	let isLoadingTextVersions = $state(false);
+	let textVersionsError = $state(null);
 	let loadError = $state(null);
 	let isSaved = $state(false);
 	let isSaving = $state(false);
@@ -84,6 +86,11 @@
 		const gen = ++billFetchGeneration;
 		isLoading = true;
 		isLoadingTextVersions = false;
+		textVersionsError = null;
+		activeVersionType = null;
+		activeFormat = null;
+		htmlContent = '';
+		aiTextContent = '';
 		loadError = null;
 		bill = null;
 		textVersions = [];
@@ -112,18 +119,8 @@
 			bill = result.bill;
 			textVersions = result.textVersions || [];
 			actions = result.actions || [];
-			if ((result.bill?.textVersionsCount || 0) > 0) {
+			if (textVersions.length === 0) {
 				void fetchTextVersionsFromAPI(billId, gen);
-			}
-
-			const saveBillKey = result.bill?.number ?? result.bill?.id ?? billId;
-			const saveRes = await fetch(
-				apiUrl(`/api/bills/save?billId=${encodeURIComponent(saveBillKey)}`)
-			);
-			if (gen !== billFetchGeneration) return;
-			if (saveRes.ok) {
-				const saveData = await saveRes.json();
-				isSaved = saveData.isSaved;
 			}
 		} catch (err) {
 			if (gen !== billFetchGeneration) return;
@@ -138,6 +135,7 @@
 
 	async function fetchTextVersionsFromAPI(billId, gen = billFetchGeneration) {
 		isLoadingTextVersions = true;
+		textVersionsError = null;
 		try {
 			const response = await fetch(
 				apiUrl(`/api/bills/${encodeURIComponent(billId)}/text-versions`)
@@ -152,6 +150,7 @@
 		} catch (err) {
 			if (gen !== billFetchGeneration) return;
 			console.error('Error fetching bill text versions:', err);
+			textVersionsError = 'Bill text versions could not be loaded. Please try again.';
 		} finally {
 			if (gen === billFetchGeneration) {
 				isLoadingTextVersions = false;
@@ -159,14 +158,44 @@
 		}
 	}
 
+	// Saved status belongs to the signed-in account and must not block public bill loading.
+	$effect(() => {
+		const ready = $authReady;
+		const userId = $currentUser?.id;
+		const billId = bill?.number ?? bill?.id;
+		isSaved = false;
+		if (!browser || !ready || !userId || !billId) return;
+
+		const controller = new AbortController();
+		void fetch(apiUrl(`/api/bills/save?billId=${encodeURIComponent(billId)}`), {
+			credentials: 'include',
+			signal: controller.signal
+		})
+			.then(async (response) => {
+				if (!response.ok) return;
+				const data = await response.json();
+				if (!controller.signal.aborted) isSaved = Boolean(data.isSaved);
+			})
+			.catch((error) => {
+				if (!controller.signal.aborted) console.error('Error checking saved bill:', error);
+			});
+		return () => controller.abort();
+	});
+
 	async function toggleSaveBill() {
 		if (isSaving || !bill) return;
+		if (!$isAuthenticated) {
+			authModalFeature = 'save bills to your account';
+			showAuthModal = true;
+			return;
+		}
 		isSaving = true;
 
 		try {
 			const action = isSaved ? 'unsave' : 'save';
 			const res = await fetch(apiUrl('/api/bills/save'), {
 				method: 'POST',
+				credentials: 'include',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ billId: bill.number, title: bill.title, action })
 			});
@@ -302,6 +331,7 @@
 	$effect(() => {
 		if (textVersions.length > 0 && !aiTextContent) {
 			// Find the first formatted text/HTML version
+			const gen = billFetchGeneration;
 			const htmlVersion = textVersions.find(
 				(v) =>
 					v.formatType?.toUpperCase() === 'FORMATTED TEXT' ||
@@ -316,7 +346,7 @@
 					fetch(apiUrl(`/api/fetch-bill-text?url=${encodeURIComponent(htmlVersion.url)}`))
 						.then((response) => response.json())
 						.then((data) => {
-							if (!data.error) {
+							if (gen === billFetchGeneration && !data.error) {
 								aiTextContent = data.content;
 							}
 						})
@@ -343,7 +373,10 @@
 	$effect(() => {
 		if (!activeFormat) return;
 
-		const formatType = activeFormat.formatType?.toUpperCase();
+		const format = activeFormat;
+		const gen = billFetchGeneration;
+		const stale = () => gen !== billFetchGeneration || activeFormat !== format;
+		const formatType = format.formatType?.toUpperCase();
 		if (formatType === 'FORMATTED TEXT' || formatType?.includes('HTM')) {
 			isLoadingHtml = true;
 
@@ -358,6 +391,7 @@
 				fetch(apiUrl(`/api/fetch-bill-text?url=${encodeURIComponent(activeFormat.url)}`))
 					.then((response) => response.json())
 					.then((data) => {
+						if (stale()) return;
 						if (data.error) {
 							throw new Error(data.error);
 						}
@@ -365,6 +399,7 @@
 						isLoadingHtml = false;
 					})
 					.catch((err) => {
+						if (stale()) return;
 						console.error('Error loading HTML:', err);
 						htmlContent =
 							'<p>Error loading bill text. You can <a href="' +
@@ -381,6 +416,7 @@
 			fetch(apiUrl(`/api/fetch-bill-text?url=${encodeURIComponent(activeFormat.url)}`))
 				.then((response) => response.json())
 				.then((data) => {
+					if (stale()) return;
 					if (data.error) {
 						throw new Error(data.error);
 					}
@@ -389,6 +425,7 @@
 					isLoadingHtml = false;
 				})
 				.catch((err) => {
+					if (stale()) return;
 					console.error('Error loading XML:', err);
 					htmlContent = 'Error loading XML content. You can view it directly on Congress.gov.';
 					isLoadingHtml = false;
@@ -714,6 +751,12 @@
 				{/if}
 
 				<!-- Bill Text Versions Section -->
+				{#if textVersionsError}
+					<p role="alert">{textVersionsError}</p>
+					<button onclick={() => fetchTextVersionsFromAPI($page.params.id)}
+						>Retry text versions</button
+					>
+				{/if}
 				{#if isLoadingTextVersions || (textVersions && textVersions.length > 0)}
 					<section class="section text-versions elevated-surface bill-section-panel">
 						<h2>Bill Text Versions</h2>
