@@ -92,6 +92,15 @@ For a consistent backup on standalone MongoDB, stop writes while dumping (for ex
 
 ## Background jobs
 
+On a fresh database, populate the Representatives tab using **Sync representatives** at
+`https://<ADMIN_DOMAIN>/admin/cron`. This requires `CONGRESS_API_KEY` and imports only
+the member directory, without the larger finance jobs. You can also run it inside
+the server container:
+
+```bash
+docker compose exec -T server bun -e 'const r = await fetch("http://127.0.0.1:1776/api/cron/sync-representatives", {headers: {authorization: `Bearer ${process.env.CRON_SECRET}`}}); console.error(await r.text()); process.exit(r.ok ? 0 : 1)'
+```
+
 Bill refresh starts automatically and runs every 15 minutes. Finance and stock jobs are manual or invoked by your own scheduler; Compose does not install a cron schedule. Run them from the admin panel or, from the VPS:
 
 ```sh

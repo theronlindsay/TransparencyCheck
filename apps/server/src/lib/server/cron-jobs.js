@@ -39,34 +39,6 @@ import {
 	normalizeSponsoredBills
 } from '$lib/server/person-cache.js';
 
-function truncate(value, max = 700) {
-	return String(value || '')
-		.replace(/\s+/g, ' ')
-		.trim()
-		.slice(0, max);
-}
-
-async function fetchJsonWithVerboseLogging(url, label, options) {
-	console.log(`[Cron:${label}] Requesting ${url}`);
-	const response = await fetch(url, options);
-	const bodyText = await response.text();
-	const preview = truncate(bodyText, 1200);
-
-	console.log(`[Cron:${label}] Response ${response.status} ${response.statusText}`);
-	console.log(`[Cron:${label}] Response preview: ${preview || '(empty body)'}`);
-
-	let json = null;
-	if (bodyText) {
-		try {
-			json = JSON.parse(bodyText);
-		} catch (error) {
-			console.warn(`[Cron:${label}] Failed to parse JSON: ${error.message}`);
-		}
-	}
-
-	return { response, json, preview };
-}
-
 function memberChamber(member) {
 	if (member.terms?.item?.length > 0) {
 		return member.terms.item[member.terms.item.length - 1].chamber;
@@ -631,18 +603,9 @@ async function runSyncStocksCronImpl() {
 	};
 }
 
-async function runSyncFinanceCronImpl() {
+async function syncRepresentativeDirectory(congressKey) {
 	await mongo();
-	console.log('[Cron:sync-finance] Starting finance sync job');
-
-	const congressKey = process.env.CONGRESS_API_KEY?.trim();
-	const fmpKey = process.env.FMP_API_KEY?.trim();
-	const fecKey = process.env.OPENFEC_API_KEY?.replace(/`/g, '')?.trim();
-
-	if (!congressKey) {
-		throw new Error('Missing CONGRESS_API_KEY');
-	}
-
+	if (!congressKey) throw new Error('Missing CONGRESS_API_KEY');
 	let offset = 0;
 	const limit = 250;
 	let fetchMore = true;
@@ -651,10 +614,7 @@ async function runSyncFinanceCronImpl() {
 
 	while (fetchMore) {
 		const url = `https://api.congress.gov/v3/member?api_key=${congressKey}&currentMember=true&limit=${limit}&offset=${offset}&format=json`;
-		const { response, json } = await fetchJsonWithVerboseLogging(
-			url,
-			'sync-finance:congress-members'
-		);
+		const response = await fetch(url, { signal: AbortSignal.timeout(20000) });
 
 		if (!response.ok) {
 			throw new Error(
@@ -662,7 +622,11 @@ async function runSyncFinanceCronImpl() {
 			);
 		}
 
-		const members = json?.members || [];
+		const json = await response.json();
+		if (!Array.isArray(json?.members)) {
+			throw new Error('Congress member sync returned an invalid response');
+		}
+		const members = json.members;
 		if (members.length === 0) {
 			fetchMore = false;
 			continue;
@@ -697,7 +661,7 @@ async function runSyncFinanceCronImpl() {
 		}
 
 		console.log(
-			`[Cron:sync-finance] Synced ${members.length} Congress members from offset ${offset}`
+			`[Cron:sync-representatives] Synced ${members.length} Congress members from offset ${offset}`
 		);
 
 		if (members.length === limit) {
@@ -711,8 +675,35 @@ async function runSyncFinanceCronImpl() {
 	await ensurePersonCacheFields(activeIds);
 
 	console.log(
-		`[Cron:sync-finance] Synced ${activeBioguideIds.size} total active members into Person collection`
+		`[Cron:sync-representatives] Synced ${activeBioguideIds.size} total active members into Person collection`
 	);
+
+	return { activeBioguideIds, nameToIdMap };
+}
+
+export async function runSyncRepresentativesCron() {
+	return await runExclusiveJob('runSyncRepresentativesCron', async () => {
+		const { activeBioguideIds } = await syncRepresentativeDirectory(
+			process.env.CONGRESS_API_KEY?.trim()
+		);
+		return { success: true, activeMembers: activeBioguideIds.size };
+	});
+}
+
+async function runSyncFinanceCronImpl() {
+	await mongo();
+	console.log('[Cron:sync-finance] Starting finance sync job');
+
+	const congressKey = process.env.CONGRESS_API_KEY?.trim();
+	const fmpKey = process.env.FMP_API_KEY?.trim();
+	const fecKey = process.env.OPENFEC_API_KEY?.replace(/`/g, '')?.trim();
+
+	if (!congressKey) {
+		throw new Error('Missing CONGRESS_API_KEY');
+	}
+
+	const { activeBioguideIds, nameToIdMap } = await syncRepresentativeDirectory(congressKey);
+	const activeIds = [...activeBioguideIds];
 
 	const sponsoredBillsSummary = await syncSponsoredBills(activeIds, congressKey);
 
@@ -855,6 +846,12 @@ async function runCheckBillsCronImpl() {
 
 export const ADMIN_CRON_JOBS = [
 	{
+		id: 'sync-representatives',
+		label: 'Sync representatives',
+		description:
+			'Populate the Congress directory from Congress.gov without importing bills, finance, or stock data.'
+	},
+	{
 		id: 'sync-fec-bulk',
 		label: 'Sync FEC bulk',
 		description:
@@ -881,6 +878,8 @@ export const ADMIN_CRON_JOBS = [
 
 export async function runAdminCronJob(jobId) {
 	switch (jobId) {
+		case 'sync-representatives':
+			return await runSyncRepresentativesCron();
 		case 'sync-fec-bulk':
 			return await runSyncFecBulkCron();
 		case 'sync-finance':
